@@ -1,138 +1,427 @@
 # Business Intelligence — POP Creations / Spruce Line PM Platform
 
-This document consolidates everything learned during the Learning Phase (Mar 30 – May 18, 2026): live webhook event data from D1, the Mar 31 ClickUp snapshot, and two rounds of employee interviews (stored in `interview_questions` table in D1).
+**Last updated:** 2026-05-18  
+**Sources:** Live D1 webhook events (Mar 30 – May 18, 2026), ClickUp snapshot (Mar 31, 2026), employee interviews (Rounds 1 & 2 with Jessica and Liz; Round 3 pending), owner context.
 
 ---
 
 ## Table of Contents
 
-1. [The Business and Its Two Divisions](#1-the-business-and-its-two-divisions)
-2. [The Team](#2-the-team)
-3. [How Work Actually Flows](#3-how-work-actually-flows)
-4. [The Complete Pipeline — All 17 Stages](#4-the-complete-pipeline--all-17-stages)
-5. [SLA Targets — Time Per Stage by Product Type](#5-sla-targets--time-per-stage-by-product-type)
-6. [Licensor Turnaround Times](#6-licensor-turnaround-times)
-7. [What the Data Shows](#7-what-the-data-shows)
-8. [Pain Points — From the People Doing the Work](#8-pain-points--from-the-people-doing-the-work)
-9. [Custom Fields in Use](#9-custom-fields-in-use)
-10. [What We Are and Aren't Capturing](#10-what-we-are-and-arent-capturing)
-11. [Requirements for the New System](#11-requirements-for-the-new-system)
-12. [AI Assistant Queries — Verbatim from Jessica](#12-ai-assistant-queries--verbatim-from-jessica)
-13. [Open Questions](#13-open-questions)
+1. [What the Company Does](#1-what-the-company-does)
+2. [Three Sales Channels](#2-three-sales-channels)
+3. [Three Ways Work Starts](#3-three-ways-work-starts)
+4. [The Team](#4-the-team)
+5. [POP Creations — Licensed Product Pipeline](#5-pop-creations--licensed-product-pipeline)
+6. [Spruce Line — Generic (Non-Licensed) Product Pipeline](#6-spruce-line--generic-non-licensed-product-pipeline)
+7. [What's in the Database (D1)](#7-whats-in-the-database-d1)
+8. [What the Data Reveals](#8-what-the-data-reveals)
+9. [Pain Points — From the People Doing the Work](#9-pain-points--from-the-people-doing-the-work)
+10. [SLA Targets — Time Per Stage by Product Type](#10-sla-targets--time-per-stage-by-product-type)
+11. [Licensor Turnaround Times](#11-licensor-turnaround-times)
+12. [Requirements for the New System](#12-requirements-for-the-new-system)
+13. [AI Assistant Queries — Verbatim from Jessica](#13-ai-assistant-queries--verbatim-from-jessica)
+14. [Open Questions](#14-open-questions)
 
 ---
 
-## 1. The Business and Its Two Divisions
+## 1. What the Company Does
 
-A home decor product company operating two distinct product lines, each with a different approval chain.
+The company designs and sources **licensed and generic home decor products** manufactured in China and imported to the United States for sale to major retail chains (Burlington, TJX/HomeGoods/Marshalls, Ross, Hobby Lobby, Walmart, Dollar General, and others).
 
-### Spruce Line
-Non-licensed home decor. No outside licensor involved.
-- Workflow: Internal design → buyer approval → done
-- Simpler, faster, lower overhead
+**75% of sales are licensed products** — home decor items carrying intellectual property from Disney, Marvel/Star Wars, Warner Bros, DC Comics, NBCUniversal, Paramount/Nickelodeon, Peanuts, and others. For licensed products, the company must obtain:
+1. **Design/concept approval** from the licensor before making samples
+2. **Sample (PPS) approval** from the licensor before starting mass production
 
-### POP Creations
-Licensed home decor carrying IP from Disney, Warner Bros, Paramount, Marvel, Nickelodeon, and others.
-- Workflow: Internal design → **licensor approval** → buyer approval → done
-- The licensor step is the major complexity driver — each licensor has different requirements, turnaround times, and submission formats
+The remaining **25% are non-licensed ("generic") products** under the **Spruce Line** brand — original designs that go through a simpler design-and-buyer-approval process with no licensor involvement.
+
+Products are designed in-house by a creative and technical team, manufactured at factories in China, imported, and shipped to retail distribution centers or sold through wholesale channels.
 
 ---
 
-## 2. The Team
+## 2. Three Sales Channels
 
-### From the D1 event log (Mar 30 – May 18, 2026)
+### Channel A — Major Retail Chains (primary)
+Direct sales to mass-market retailers: Burlington, TJX family (HomeGoods, Marshalls, TJ Maxx), Ross, Hobby Lobby, Walmart, Dollar General, Amazon, Hot Topic, Box Lunch, Kohl's, Five Below, and others. These accounts drive the core business. Each sale is tracked as a "project" — an offer to a specific buyer at a specific retailer for a specific season.
 
-| User | Events | Role |
-|------|--------|------|
-| Elizabeth (Liz) | 469 | Art Director — reviews and approves all licensing sheets; the internal gate before anything goes to the licensor |
+### Channel B — Wholesale Sublicensors (secondary)
+Online sellers (identified in data: **Stallion Art**, **Iconick**) who buy the product and sell it themselves under their own brand, but sublicense the IP from this company. These sellers still require licensor approval on all designs — they go through the same POP Creations approval pipeline. Tags `stallion art wholesale only` (62 tasks) and `iconick only` (5 tasks) appear in ClickUp to route tasks appropriately.
+
+### Channel C — Internal / New Product Development
+Products developed internally without a specific buyer request — the company builds a product line or refreshes an existing line and then presents it to buyers. Tagged `prod development` in ClickUp (142 tasks). Managed via the "New Prod Development" list.
+
+---
+
+## 3. Three Ways Work Starts
+
+The product lifecycle can be triggered three ways:
+
+| Trigger | ClickUp List / Tag | Description |
+|---------|-------------------|-------------|
+| **A. Customer request** | `Customer Refresh` list (264 products), `Customer Category Expansion` list (78 products) | A retail buyer asks the sales team for a specific product type, format, or refresh of an existing line. Sales relays the brief to the PM (Jessica). |
+| **B. Internal line refresh** | `customer refresh` tag (1,516 tasks) | Company decides proactively to refresh a product line — update designs, add new licensors/properties, expand a product category — without a buyer initiating it. Presented to buyers afterward. |
+| **C. New product development** | `New Prod Development` list (199 products), `prod development` tag (142 tasks) | Product development team identifies a new product format or category and develops it into a full concept before seeking buyer interest. |
+
+---
+
+## 4. The Team
+
+### Activity in the live event log (Mar 30 – May 18, 2026)
+
+| Name | Events | Role (confirmed) |
+|------|--------|-----------------|
+| Elizabeth (Liz) Parkin | 469 | Creative Director — approves all preliminary designs and licensing sheets; the primary internal gate before anything goes to a licensor |
 | Umamaheswararao Meka | 443 | Technical Lead Designer — audits technical work, manages factory communication |
-| Jennifer Chaffier | 177 | Designer or coordinator |
-| Ilona Kereki | 43 | Designer |
-| Vaibhav | 30 | Designer (likely offshore) |
+| Jennifer Chaffier | 177 | Designer / coordinator (likely Spruce Line — see note) |
+| Ilona Kereki | 43 | Creative Designer |
+| Vaibhav | 30 | Designer (offshore) |
 | Marcel Zabolotniy | 15 | Designer |
-| Jessica Cortázar | 8 | Project Manager — does less direct task work, more oversight and stage advancement |
+| Jessica Cortázar | 8 | Project Manager — oversees full pipeline, manually advances stages |
 | Érica Perestrelo | 6 | Designer |
 
-### Full role map (from Jessica, Q4)
+**Note on Liz:** Previously the Art Director under the Creative Director Sarbani (who left ~2 years ago). Liz is now Creative Director. A formal "Sarbani Approval" checkpoint still exists in the system — whether Liz has taken over that responsibility is a question for Round 3.
 
-- **Project Manager (Jessica)** — oversees the full pipeline, advances most non-licensing stages manually, allocates designers to projects
-- **Sales Manager** — communicates with buyers, sends preliminary concepts, notifies buyers of licensor-requested changes, converts picks into actual orders
-- **Art Director (Liz)** — approves preliminary designs sent to buyers; approves licensing sheets before submission; critical internal gate for everything going external
-- **Technical Lead Designer** — audits all technical design work; manages factory communication; sends files to factories; handles reorder file updates
-- **Technical Designers** — create costing sheets, licensing sheets, Techpack files for factory, packaging designs, and revise professional photos
-- **Creative Senior Designer** — advises creative team on product restrictions, materials, and constraints
-- **Creative Designers** — create preliminary concepts for buyers, prepare art files for picks, write SKU descriptions
-- **Sourcing Managers** — review costing sheets, source factories that can produce the products
-- **Licensing Manager / Coordinator** — submits concepts and packaging to licensor portals, downloads assets for all licenses and properties
-- **Production Managers** — manage production phase
-- **Factories** — external; receive Techpack files, produce PPS samples, execute mass production
+**Note on "Adam":** Sales person. 104 tasks are tagged `for adam`, suggesting tasks are routed to him for sales action. Exact meaning of the tag needs clarification from Jessica (Round 3 question).
 
-Total workspace: ~64 users (from snapshot)
+**Note on "Jen":** Jennifer Chaffier is Creative Director of the Spruce Line (non-licensed). She uses ClickUp very differently from the licensed team. Interview pending (Round 3 — Jen).
 
----
+### Full role map (from Jessica, interview Round 1)
 
-## 3. How Work Actually Flows
-
-### What a ClickUp card actually represents (Jessica, Q7)
-
-Each card = **one offer to one specific buyer for one season at one retailer.**
-
-> "Each card corresponds to a project. This means it represents an offer made to a specific buyer at one of our retailer clients, for a specific season. For example Julie Greer at Burlington for Valentines 2027, or Alice Zhu at Dollar General for Fall Winter 2026."
-
-Each project card carries:
-- Buyer name and retailer
-- Season (e.g., Valentines 2027, Fall/Winter 2026)
-- Types of products requested
-- License properties requested (and their valid date ranges per style guide)
-- Any additional constraints from Sales
-
-When a buyer makes official selections, **a separate SKU card is created for each picked design**, and those SKU cards are linked to the project card.
-
-### Idea to SKU
-
-1. **Idea origin** — retail visits, factory offers, internet inspiration, or existing product formats
-2. **Teams engaged early** — Sales (verify/raise buyer interest), Technical Design (references + costing sheet), Sourcing (factory options)
-3. **Buyer selects a format** — material, size, specifications
-4. **Creative designer prepares art files** for the selected format
-5. **Technical designer creates licensing sheet and packaging design** using the art files
-6. **Art Director (Liz) reviews and approves** the licensing sheet — nothing goes to the licensor without her sign-off
-7. **Licensing team submits** concept to licensor portal
-8. **Licensor responds** — approved, approved with changes, or revision requested
-9. Pipeline continues through sampling → production approval (see full stage list below)
+- **Project Manager (Jessica)** — oversees full POP Creations pipeline, allocates designers, currently advances most non-licensing stages manually
+- **Sales (Adam)** — communicates with buyers, sends preliminary concepts, converts picks into orders
+- **Creative Director (Liz Parkin)** — approves preliminary designs and licensing sheets; the internal gate before anything external
+- **Technical Lead Designer** — audits technical design, manages factory communication, sends files to factories
+- **Technical Designers** — costing sheets, licensing sheets, Techpack files, packaging designs
+- **Creative Senior Designer** — advises creative team on product restrictions, materials
+- **Creative Designers** — preliminary concepts for buyers, art files for picks, SKU descriptions
+- **Sourcing Managers** — costing sheets, factory sourcing
+- **Licensing Manager / Coordinator** — submits to licensor portals, downloads licensor assets
+- **Production Managers** — production phase
+- **Factories (China)** — receive Techpacks, produce PPS samples, execute mass production
+- **Jen (Spruce Line Creative Director)** — runs the Spruce Line independently; interview pending
 
 ---
 
-## 4. The Complete Pipeline — All 17 Stages
+## 5. POP Creations — Licensed Product Pipeline
 
-From Jessica's answer to Q10 — these are the actual status values used in ClickUp's Licensing Management dashboard:
+### What a ClickUp record represents
+
+There are two levels:
+
+**Project card** = one offer to one buyer at one retailer for one season. Example: "Julie Greer at Burlington for Valentines 2027." Carries: buyer name, retailer, season, license restrictions, product types, on-shelf date, and PPS-requested date.
+
+**SKU card** = one specific product that a buyer picked from a presentation. Linked to its project card. Carries the full approval history from design through production.
+
+### The 17-stage pipeline (confirmed verbatim from Jessica, Q10)
 
 | # | Stage | Owner | Notes |
 |---|-------|-------|-------|
-| 1 | **Art files creation** | Creative Designer | Prepares artwork based on buyer's format selection |
-| 2 | **Licensing sheet creation** | Technical Designer | Uses art files to build the LS and packaging design |
-| 3 | **Licensing sheet review** | Art Director (Liz) | Internal gate — nothing moves forward without her approval |
-| 4 | **Ready to submit** | Art Director → Licensing Team | Art Director sends approved sheet to licensing team |
-| 5 | **Concept submitted** | Licensing Team | Licensing team submits to licensor portal |
-| 6 | **Revisions** | Creative + Technical Designer | Licensor rejected concept or packaging — rework required |
-| 7 | **Concept approved** | — | Licensor approved with no corrections |
-| 8 | **Concept approved with changes** | Creative + Technical Designer | Approved but minor revisions required before sampling |
-| 9 | **PO received** | Technical Designer | Buyer sent an order — Techpack files must be prepared |
-| 10 | **Sales requested sample** | Technical Designer | No order yet, but buyer wants to see a physical sample before committing |
-| 11 | **Sample requested** | Factory | Techpack files sent to factory (either because of PO or sales request) |
-| 12 | **Sample received** | Art Director + Licensing Team | Factory sent PPS photos — internal review before submitting to licensor |
-| 13 | **Factory resample** | Factory | Sample had errors — must be corrected and re-photographed |
-| 14 | **Sample sent to licensor** | Licensing Team | PPS submitted to licensor (internally called "PPS submitted") |
-| 15 | **Sample revision** | Creative + Technical Designer | Licensor sent changes to the sample |
-| 16 | **Pre-production approved** | — | PPS approved; authorization to start mass production (internally called "PPS approved") |
-| 17 | **Production approved** | — | All requirements met; submission closed in licensing system. Requirements vary by licensor (some need safety form, some need physical sample at their office, some satisfied with PPS approval) |
+| 1 | Art files creation | Creative Designer | Artwork for buyer's selected format |
+| 2 | Licensing sheet creation | Technical Designer | LS + packaging design using art files |
+| 3 | Licensing sheet review | Creative Director (Liz) | Internal gate — nothing advances without her approval |
+| 4 | Ready to submit | Liz → Licensing Team | Liz sends approved sheet to licensing team |
+| 5 | Concept submitted | Licensing Team | Submitted to licensor portal |
+| 6 | Revisions | Creative + Technical Designer | Licensor rejected concept or packaging |
+| 7 | Concept approved | — | Licensor approved with no corrections |
+| 8 | Concept approved with changes | Creative + Technical Designer | Approved but minor revisions required before sampling |
+| 9 | PO received | Technical Designer | Buyer sent purchase order; Techpack files prepared |
+| 10 | Sales requested sample | Technical Designer | No PO yet but buyer wants physical sample before committing |
+| 11 | Sample requested | Factory | Techpacks sent to factory |
+| 12 | Sample received | Liz + Licensing Team | Factory sent PPS photos; internal review before submitting to licensor |
+| 13 | Factory resample | Factory | Sample had errors — corrected and re-photographed |
+| 14 | Sample sent to licensor | Licensing Team | PPS submitted (internally: "PPS submitted") |
+| 15 | Sample revision | Creative + Technical Designer | Licensor sent changes to sample |
+| 16 | Pre-production approved | — | PPS approved; mass production authorized |
+| 17 | Production approved | — | All licensor requirements met; submission closed |
 
-**Note on naming:** ClickUp's internal stage names don't always match licensor terminology. "Pre-production approved" = PPS approved internally. "Production approved" = final licensor sign-off.
+### Formal checkpoints tracked in D1 (27 milestones)
+
+The `checkpoint_map` table defines formal milestones beyond just stage status:
+
+**Design phase:**
+concept_submitted → concept_revision_submitted → concept_approved → group_concept_approved → packaging_concept_approved → pkg_concept_revision
+
+**Production prep:**
+art_complete → designs_complete → tech_packs_complete → tech_pack_check
+
+**Sampling:**
+sample_requested → sampling_request → sample_submitted → sample_approved → pps_submitted → pps_approval → pps_revision
+
+**QC / Production:**
+factory_qc_china → pi_approved → production_approved
+
+**Fulfillment / Compliance:**
+licensor_approval → sarbani_approval → contractual_submitted → contractual_approved → buyer_picks → brand_assurance → buyer_presentation
+
+**Note:** `sarbani_approval` refers to the previous Creative Director (Sarbani) who left ~2 years ago. Whether Liz has assumed this checkpoint is unconfirmed. `pi_approved` (Product Integrity) is only checked on 45 of 9,069 products — its meaning and trigger conditions are unclear (Round 3 question for Jessica). `brand_assurance` is also unconfirmed.
+
+### SKU naming convention
+
+Products in the system follow a structured SKU code format:
+```
+[FORMAT][SIZE][LICENSOR-ABBR][PROPERTY-ABBR][MATERIAL-ABBR][##]  [Full description + dimensions]
+```
+Example: `GFZ80MVAV01 Marvel printed glass Avengers high render group on yellow A logo 8x10"`
+Example: `MTC3ADYPN02 Disney MDF die-cut block Groovy Princess Tiana 3x4"`
+
+### File storage
+Design files are **not stored in ClickUp**. They live on a Synology NAS server accessible as:
+- Windows path: `S:\[Licensor]\[Season]\[Project]\`
+- UNC path: `\\edgesynology1\files\shared\...`
+
+Designers comment on ClickUp tasks with the NAS path when their work is done. The company also has a **DAM (Digital Asset Management)** system that thumbnails all NAS files and stores thumbnails on DigitalOcean Spaces (S3-compatible). This DAM can be integrated into Plane for thumbnail previews while keeping full-size files on the NAS.
 
 ---
 
-## 5. SLA Targets — Time Per Stage by Product Type
+## 6. Spruce Line — Generic (Non-Licensed) Product Pipeline
 
-From Jessica (Q16). Times in **minutes** for design/technical stages.
+Spruce Line is structurally **different** from POP Creations. Based on the data:
+
+- No licensor approval step
+- Tasks appear to track **design collections and presentations** rather than individual product SKUs (task names like `"Gaming - updated 10.27.25"`, `"BCF - Kim/Anna - New Formats & Art"`, `"Soft Religion - updated 2.11.26"`)
+- The primary list is **Edge Generic** (701 products in Spruce Line's main tracking list)
+- "Edge" appears to be the Spruce Line's brand name within the company
+
+### Observed Spruce Line stages (from data)
+
+The active products in Spruce Line skip the Concept/Licensor stages entirely. Live stages seen:
+
+| Stage | Active Count | Notes |
+|-------|-------------|-------|
+| Ideas / Ideation | 20 | Raw concepts |
+| In Progress | 7 | Design underway |
+| Internal Approval | 6 | Internal review before buyer presentation |
+| In Work | 5 | Active production work |
+| With Buyer for Approval | 5 | Presented to buyer, waiting feedback |
+| Waiting for Factory | 4 | Handed to factory |
+| Art Sent for PO | 7 | Art sent to buyer for purchase order |
+| Complete | 642+ | Done |
+| Wall Art / Floor Coverings / Seasonal / Storage | (category labels) | Used as organizational buckets, not pipeline stages |
+
+### How Jen manages Spruce Line (requires Round 3 interview)
+The data strongly suggests Jen manages Spruce Line presentations as collections/catalogs (a "Gaming" collection, a "Christmas" collection, a "Soft Religion" collection) that she presents to multiple buyers. Individual products within a collection are likely tracked differently, or not at all, in ClickUp. This is a major gap — Jen's interview will reveal the actual process.
+
+---
+
+## 7. What's in the Database (D1)
+
+**Database ID:** `c37aeb36-e16e-416b-b699-c910f6f8dc10`  
+**Cloudflare account:** `u2giants`  
+**MCP tool:** `mcp__9a4e64b3-8b0d-4708-9ca2-19515b76966e__d1_database_query`
+
+### Table inventory
+
+| Table | Rows | What it contains |
+|-------|------|-----------------|
+| `products` | 9,069 | **Primary query surface.** Enriched, denormalized view of every ClickUp task that represents a product. Includes stage, licensor, retailer, milestone flags, revision counts, pipeline age, assignees. Always filter `WHERE is_internal = 0` to exclude the dev space. |
+| `tasks` | 17,751 | Raw ClickUp tasks from snapshot. Parent to most other tables. |
+| `status_transitions` | 17,978 | Every status change ever recorded. Most have `from_status = NULL` (snapshot import). Only ~473 have real from→to transitions (live webhook period). |
+| `task_assignments` | 14,670 | Who was assigned to what task, with timestamps. |
+| `task_comments` | 244 | Comment text extracted from ClickUp. Many are NAS file paths or @mentions. |
+| `task_tags` | 13,333 | Tags on tasks — primary signal for licensor, channel, and workflow routing. |
+| `task_custom_fields` | 3,733 | Custom field values (SMPL Req, Revision received, Customer/Retailer, Factory, put-up, Category, etc.) |
+| `workflow_stages` | 76 | Maps raw ClickUp status strings → clean stage names with stage_order and category. |
+| `checkpoint_map` | 27 | Defines all formal milestone checkpoints (concept_submitted through buyer_presentation). |
+| `product_checkpoints` | 32,534 | Per-product checkpoint records (which milestones each product has reached). |
+| `users` | 64 | User IDs only — names are NULL. Names come from the `events` table. |
+| `spaces` | 3 | POP Creations, Spruce Line, designflow (internal dev). |
+| `lists` | 21 | All ClickUp lists across 3 spaces. |
+| `licensors` | 34 | Licensor reference table. |
+| `retailers` | 26 | Retailer reference table. |
+| `events` | 1,247 | Live webhook events Mar 30 – May 18, 2026. Contains user names. |
+| `interview_questions` | 27 | All interview Q&A (Rounds 1 & 2, Jessica + Liz). |
+| `task_attachments` | 0 | Empty — `taskAttachmentUpdated` webhook not yet subscribed. |
+| `task_links` | 0 | Empty — `taskLinkedTasksUpdated` webhook not yet subscribed. |
+| `time_entries` | 0 | Empty — time tracking API returns no data. |
+| `custom_field_definitions` | 0 | Empty — list-level field definitions not yet fetched. |
+| `workspaces` | 1 | Single workspace (ID: 2298436). |
+
+### Key lists
+
+| List | Space | Products | Active | Purpose |
+|------|-------|----------|--------|---------|
+| Licensing Management | POP Creations | 7,281 | 8 | Primary SKU tracking for all licensed products |
+| Edge Generic | Spruce Line | 701 | 123 | Primary Spruce Line design tracking |
+| Customer Refresh | POP Creations | 264 | 93 | Buyer-requested refreshes |
+| Licensing Administration Tasks | POP Creations | 236 | 41 | Admin/coordination tasks |
+| New Prod Development | POP Creations | 199 | 26 | Internal new product development |
+| Freelancers Generic | Spruce Line | 111 | 17 | Freelancer-managed Spruce Line work |
+| Customer Category Expansion | POP Creations | 78 | 12 | Buyer requests for new product categories |
+| General Presentations | Spruce Line | 48 | 26 | General buyer presentations |
+
+---
+
+## 8. What the Data Reveals
+
+### Product volume by stage (POP Creations, all time)
+
+| Stage | Category | Products | Active Now |
+|-------|----------|----------|-----------|
+| Pre-Production Approved | Pre-Production | 2,387 | 4 |
+| Production Approved | Production | 2,175 | 0 |
+| Concept Approved | Concept | 1,574 | 0 |
+| Complete | Complete | 932 | 117 |
+| Sample Requested | Pre-Production | 313 | 3 |
+| Concept Submitted | Concept | 327 | 0 |
+| Revisions | Concept | 210 | 0 |
+| (Design stages) | Design | ~227 combined | ~68 |
+| (Ideation stages) | Ideation | ~163 combined | ~36 |
+
+**Key observation:** 1,574 products are at "Concept Approved" but have no active next step. These are approved designs sitting dormant, waiting for a buyer to place a PO. What triggers them to advance — or be abandoned — is unclear.
+
+### Milestones reached (of 9,051 products)
+
+| Milestone | Count | % of Products |
+|-----------|-------|--------------|
+| Concept Approved | 2,313 | 25.6% |
+| Tech Pack Checked | 2,041 | 22.5% |
+| Art Complete | 1,485 | 16.4% |
+| Sample Approved | 878 | 9.7% |
+| PI Approved | 45 | 0.5% |
+
+### Licensor breakdown (by product count)
+
+| Licensor | Products | Avg Concept Revisions |
+|----------|----------|-----------------------|
+| Disney | 2,182 | 0.26 |
+| Marvel | 1,396 | 0.43 |
+| Star Wars | 749 | 0.19 |
+| DC Comics | 450 | 0.31 |
+| Warner Bros | 399 | 0.26 |
+| Peanuts | 131 | 0.38 |
+| Care Bears | 33 | 0.00 |
+| SEGA | 16 | 1.00 |
+| Nickelodeon | 16 | 0.00 |
+| Universal | 15 | 0.00 |
+| WWE | 13 | 0.00 |
+
+**SEGA is the most demanding licensor** — every product that went through SEGA needed at least one concept revision. Marvel and Peanuts are also significantly more demanding than Disney or Star Wars.
+
+### Retailer breakdown (active products, from custom fields)
+
+Burlington (23), Hobby Lobby (11), Ross (11), Walmart (8), TJX (8), Dollar General (4), Box Lunch (4), Amazon (4), HomeGoods (3), Kohls (2), Hot Topic (2), Five Below (2), At Home (2), Costco (2), DD's (2), Ollies (2)
+
+### Pipeline aging (active products only)
+
+| Stage Category | Avg Days in Pipeline | Max Days |
+|----------------|---------------------|----------|
+| Pre-Production | 350 days | 975 days |
+| Production | 328 days | 1,720 days |
+| Design | 285 days | 739 days |
+| Fulfillment | 238 days | 500 days |
+| Ideation | 145 days | 1,203 days |
+
+Products at "SKU Created" stage: 246 products, **averaging 1,011 days (2.8 years)** in the pipeline. Some products have been in the system for 4–5 years. Whether these are still active or simply never closed is an open question.
+
+### Revision patterns
+
+| Pattern | Products |
+|---------|----------|
+| 0 concept revisions, 1 sample round | 1,632 |
+| 2 concept revisions, 1 sample round | 968 |
+| 4 concept revisions, 2 sample rounds | 2 |
+
+~37% of products that went through sampling also needed 2 concept revisions before the sample was requested.
+
+### Tags as business signals
+
+Key tags and what they represent:
+
+| Tag | Count | Meaning |
+|-----|-------|---------|
+| disney | 3,574 | Disney-licensed products |
+| marvel | 2,125 | Marvel-licensed products |
+| customer refresh | 1,516 | Buyer requested refresh of existing line |
+| wb | 1,208 | Warner Bros-licensed |
+| star wars | 1,095 | Star Wars-licensed |
+| nick | 495 | Nickelodeon-licensed |
+| nbcu | 491 | NBCUniversal-licensed |
+| on po | 356 | Product has a purchase order |
+| sega | 341 | SEGA-licensed |
+| peanuts | 272 | Peanuts-licensed |
+| before and after presentation | 228 | Presentation format showing design evolution |
+| customer category expansion | 182 | Buyer requesting new product categories |
+| for licensor | 160 | Task routed for licensor submission |
+| prod development | 142 | Internal product development |
+| strawberry shortcake | 142 | Strawberry Shortcake-licensed |
+| internal approval | 133 | Requires internal sign-off |
+| packaging submitted | 105 | Packaging sent to licensor |
+| for adam | 104 | Routed to Adam (Sales) — exact meaning TBD |
+| one piece | 89 | One Piece-licensed |
+| packaging approved | 65 | Licensor approved packaging |
+| stallion art wholesale only | 62 | Wholesale sublicensor channel (Stallion Art) |
+| click team only | 68 | Internal-only visibility |
+| coca cola | 50 | Coca-Cola-licensed |
+| for factory | 39 | Routed to factory |
+| template | 33 | Template task (not a real product) |
+
+### What comments reveal about operations
+
+Recent task comments show:
+- Designers paste **NAS file paths** when work is done: `S:\Coca Cola\27 SS Seasonal Broadcast\27 SS Y2K Overdrive\Y2K Overdrive`
+- Presentations are shared as **PDFs** via ClickUp comments: `BoxLunch_newDevelopments26-v4.pdf`
+- Creative direction happens in comments: *"come up with concepts that make sense.. mickey with glasses on that light up.. or stitch space goggles. Fun newness that will be attractive to a home buyer"*
+- `@Elizabeth @Jessica` appear together frequently — Liz is always in the approval loop with Jessica
+- Instructions reference NAS paths by UNC: `\\edgesynology1\files\shared\Sales Sheets...`
+
+### What the live webhook data (49 days) shows
+
+**1,247 events captured.** Top signals:
+- `content` field changes (441) and `status` changes (433) are nearly equal — as much editing/rework as forward movement
+- `assignee_add` (87) shows frequent handoffs
+- `attachments` (52) — files being added, though not captured as dedicated webhook events
+- Peak hours: 9am–1pm Eastern
+
+The only live status transitions with known from→to are mostly from the `designflow` (software dev) space. Product pipeline transitions during this window show the actual flow rarely captured: `int apprvd/selections made` → `smpl req`, `send out art for po` → `complete`, `with buyer for approval` → various states.
+
+---
+
+## 9. Pain Points — From the People Doing the Work
+
+### Jessica (Project Manager) — Rounds 1 & 2
+
+**1. Lost preliminary designs** (Q6, Q8)
+> "Designs that are lost are lost several times a week. On several occasions, we've tried to reuse these designs for other projects to avoid starting from scratch. But this involves manually searching through past presentations to see what we can reuse and manually moving those files."
+Search needed by: license, license property, product type, season.
+
+**2. Art Director bottleneck** (Q11) — five root causes:
+1. Sheets accumulate while Liz handles other responsibilities
+2. Liz changes artwork she already approved at the buyer stage — entire LS must be redone
+3. Unfamiliarity with product type forces consultation with senior creative, sales, production, or sourcing
+4. Color preferences — colors approved for the buyer presentation are later rejected at LS stage
+5. License property errors (e.g., Mickey and Friends artwork on a Mickey Mouse submission)
+
+**3. Manual stage advancement** (Q13)
+> "I'm the only one who moves certain SKU stages. The creative team should be able to tell me when each art file is ready and include the file path on the server, and I should be able to select multiple SKUs and assign the licensing sheet to a technical designer within the same system."
+
+**4. Fear of batch uploads** (Q17)
+> "I'm worried the team will do everything locally and not upload until everything is finished. If they have 20 SKUs, I can't wait for them to create 20 art files. I want to know if they have the first 5, the first 10."
+
+**5. Multi-buyer conflicts** (Q9) — when two buyers pick the same design, a modified version is quietly made and presented as a design change, without explaining why.
+
+**6. No time visibility** (Q12, Q15)
+> "I'd like the system to tell me if a SKU has been stuck in a single stage for too long. Also, if a design gets stuck at Concept Approved but never reaches Purchase Order, because then we're wasting that work."
+
+**7. Two separate dates not tracked** (Q21) — on-shelf date and PPS-requested date are different and both need to be tracked.
+
+**8. Costing sheet constraints not accessible at design time** (Q21) — designers need factory constraints (die lines, color count, printing technique) while designing, not after the LS is rejected.
+
+### Liz (Creative Director) — Round 2
+
+**1. Missing product manufacturing specs** (Q27)
+> "Specs, the way a product is made — it's the little details on each product type that take up the most time."
+
+**2. Pantone errors** (Q25)
+> "The main issues are the Pantones not being provided or wrong colors wrote out."
+
+**3. Designer variance** (Q26) — some designers understand retailer aesthetics and licensor requirements; others don't. Designers who don't know a licensor's rejection patterns create more rework for Liz.
+
+**4. Informal feedback loop** (Q24) — corrections go via Teams messages or Illustrator markups. No structured revision tracking in the system.
+
+---
+
+## 10. SLA Targets — Time Per Stage by Product Type
+
+From Jessica (Q16). Times in **minutes**.
 
 | Product Type | Brief | Design | Art File | Licensing Sheet | Revisions | Techpack for Factory |
 |---|---|---|---|---|---|---|
@@ -156,13 +445,11 @@ From Jessica (Q16). Times in **minutes** for design/technical stages.
 | Floor Coverings | 10 | 15 | 20 | 50 | 20 | 16 |
 | Garden | 30 | 30 | 40 | 100 | 40 | 32 |
 
-These numbers will drive automatic stage-overdue alerts in the new system. A SKU that has been in "Art File" stage for longer than its product type's art file time should surface as at-risk.
-
 ---
 
-## 6. Licensor Turnaround Times
+## 11. Licensor Turnaround Times
 
-From Jessica (Q16). Used for deadline calculation and alert thresholds.
+From Jessica (Q16).
 
 | Licensor | Expected Response |
 |----------|-------------------|
@@ -183,281 +470,93 @@ From Jessica (Q16). Used for deadline calculation and alert thresholds.
 
 ---
 
-## 7. What the Data Shows
-
-### Live event log (D1) — Mar 30 to May 18, 2026
-
-**1,247 total events** captured across 49 days.
-
-#### Event type breakdown
-
-| Event Type | Count |
-|------------|-------|
-| taskUpdated | 853 |
-| taskStatusUpdated | 223 |
-| taskCreated | 56 |
-| taskAssigneeUpdated | 54 |
-| taskCommentPosted | 27 |
-| taskMoved | 19 |
-| taskDueDateUpdated | 8 |
-| listUpdated / listCreated | 5 |
-| taskPriorityUpdated | 1 |
-
-#### What fields are changing most
-
-| Field Changed | Count | Meaning |
-|---------------|-------|---------|
-| content | 441 | Task description/body edits — high revision activity |
-| status | 433 | Stage transitions — the workflow is moving |
-| assignee_add | 87 | Work is being handed off frequently |
-| comment | 54 | Communication happening in-task |
-| attachments | 52 | Files being added (design files, licensor sheets) |
-| section_moved | 38 | Tasks moved between list sections |
-| name | 33 | Task titles being updated |
-| custom_field | 15 | Product-specific fields being filled in |
-| assignee_rem | 14 | Reassignments |
-| due_date | 8 | Deadline changes |
-| priority | 2 | Rarely used |
-
-#### When the team works (UTC hours, top 5)
-
-| UTC | Events | ~Eastern |
-|-----|--------|----------|
-| 14:00 | 265 | 10am |
-| 16:00 | 231 | 12pm |
-| 15:00 | 142 | 11am |
-| 17:00 | 113 | 1pm |
-| 13:00 | 104 | 9am |
-
-Peak activity is **9am–1pm Eastern**. Secondary cluster around 3–4pm ET likely reflects offshore contributors.
-
-### Snapshot — Mar 31, 2026
-
-- **17,746 tasks** total (including closed)
-- **3 spaces** (Spruce Line, POP Creations, + internal/dev)
-- **~50 lists**
-- **64 users**
-- **96% of tasks are subtasks** — the primary unit of work is the subtask, not the top-level card
-- **495 linked task relationships** in `linked_tasks` field
-- **91 attachments** found in comments sample
-
----
-
-## 8. Pain Points — From the People Doing the Work
-
-### Jessica (Project Manager) — Rounds 1 & 2
-
-**1. Lost preliminary designs** (Q6, Q8)
-> "Designs that are lost are lost several times a week. On several occasions, we've tried to reuse these designs for other projects to avoid starting from scratch. But this involves manually searching through past presentations to see what we can reuse and manually moving those files, which only exist there, to another location."
-
-Designs that buyers don't select disappear into the old task. No time to organize rejects during normal operations. Search needed by: license, license property, product type, and season.
-
-**2. Art Director bottleneck** (Q11)
-Five distinct causes, per Jessica:
-1. Licensing sheets accumulate while Liz handles other responsibilities
-2. Liz sometimes changes artwork she already approved at the buyer stage — the entire licensing sheet must be redone
-3. Unfamiliarity with a product type forces Liz to consult the senior creative designer, sales, production, or sourcing before approving — or it surfaces that the art file doesn't match what the buyer actually asked for
-4. Color preferences — colors that were approved for the buyer presentation are later rejected at the licensing sheet stage
-5. License property errors (e.g., Mickey and Friends artwork on a Mickey Mouse submission) — licensing team returns sheets to this stage until corrected
-
-**3. Jessica manually advances most stages** (Q13)
-> "I'm the only one who moves certain SKU stages (all those not directly related to licensing responses), instead of allowing each person to advance SKUs. For example, the creative team should be able to tell me when each art file is ready and include the file path on the server, and I should be able to select multiple SKUs and assign the licensing sheet to a technical designer within the same system, instead of manually accessing each SKU and assigning it."
-
-Past attempts to decentralize failed. Root causes: team not tech-savvy, forgot the system, workflow disruption.
-
-**4. Fear of incomplete uploads from the team** (Q17)
-> "I'm also worried that the team will do everything locally on their computer and not upload the documents, tests, or progress reports until everything is finished. For example, if they have 20 SKUs, I can't wait for them to create 20 art files. I want to know if they have the first 5, the first 10, and so on, so we can keep moving forward and make the most of our time."
-
-**5. Multi-buyer conflicts** (Q9)
-> "Our current solution is for the creative designer to create a second version of the design with minor changes (icons, image sizes, colors, or embellishments), and the sales team presents this second version to one of the buyers to let them know we had to make some changes to the design. We don't usually go into detail about the reasons for these changes with the buyer."
-
-**6. No time visibility / stuck SKUs** (Q12, Q15)
-> "I'd like the system to tell me if a SKU has been stuck in a single stage for too long without progressing. Also, if a design gets stuck at Concept Approved but never reaches Purchase Order or there's no sampling request, because then we're wasting that work if it doesn't result in a sale."
-
-> "For each SKU, I would like to see how long it has been in a certain status, how long ago its entire cycle began, and the deadline for it to change status so that the on-shelf date is met (retroactive planning based on the remaining stages and what we know they take)."
-
-**7. Missing data fields** (Q21)
-- **On-shelf date ≠ PPS-requested date** — these are two separate dates that need to be tracked independently
-- **Costing sheet constraints** — designers need access to the factory's production constraints (die lines, number of colors, printing technique, legal line placement) at design time, not after the licensing sheet is rejected
-- **Change-of-hands history** — when a different designer takes over a SKU mid-process, the history should show who did what and when
-
-**8. Worst recent bottleneck** (Q19)
-> "We had many Hobby Lobby picks simultaneously and needed to sample everything. The creatives weren't delivering the artwork quickly enough to produce licensing sheets due to the sheer volume, and also because some of the product types were new and they didn't fully understand how the artwork should be set up. The technical designers had to work overtime to finish the licensing sheets and tech packs for the factory on time. I had to pull creatives from other projects to help. And I had to send samples and submit them simultaneously (samples without approvals)."
-
-Second incident: Large Ollies order required pausing all other projects to prioritize tech packs.
-
-**9. What makes a product go smoothly** (Q18)
-> "When the design quality is good and incorporates storytelling elements, we have fewer licensor reviews, and approvals are faster. Also, when the creative designer clearly defines the assets and style guidelines used, the packaging is easy for the technical designers to identify and design, resulting in fewer packaging revisions. Extremely important is when both the technical and creative designers have a clear understanding of the design constraints for the product type, based on the agreed-upon costs with the manufacturers."
-
----
-
-### Liz / Elizabeth (Art Director) — Round 2
-
-**1. Missing product manufacturing specs** (Q27)
-> "Specs, the way a product is made — it's the little details on each product type that take up the most time."
-
-When a submission arrives without complete manufacturing specs, Liz must go back to the designer before she can approve.
-
-**2. Missing or wrong Pantones** (Q25)
-> "The main issues are the Pantones not being provided or wrong colors wrote out."
-
-Templates have reduced most other common errors. Pantones remain the top blocker.
-
-**3. Volume and daily rhythm** (Q22)
-> "20 plus some weeks. I check in every day to see if I need to submit anything. So it's split up but I do spend an hour a day submitting."
-
-**4. Informal feedback loop** (Q24)
-> "If it's a presentation I would typically put the screen shot in illustrator and mark up writing out what I want changed or I write the designer on teams all my corrections. Sometimes I will get on a Teams call to discuss."
-
-No structured revision tracking. Corrections live in Teams messages and Illustrator files, not in the system.
-
-**5. Designer variance** (Q26)
-> "There are designers that get the aesthetic of the retailer and know how to design for that specific account and there are others who don't. I also know when a licensor will reject a certain design based on licensor requirements so that is also something some designers need to learn."
-
----
-
-## 9. Custom Fields in Use
-
-From task payloads in the Mar 31 snapshot. All present on ~100% of POP Creations tasks unless noted.
-
-| Field Name | Type | Notes |
-|------------|------|-------|
-| DATE FCTRY SELECTED | date | Factory selection date |
-| DATE TLR | date | Internal milestone date |
-| Idea/Task Type | labels | Categorizes type of work |
-| Next Review Date | date | Drives scheduling |
-| SAS-PO | date | PO-related date |
-| SMPL Req | number | Sample request quantity/status |
-| 🏭 Factory | dropdown | Which factory |
-| 📚 Category | dropdown | Product category |
-| 🧑‍✈ Customer / Retailer | dropdown | The buyer/retailer |
-| Due Date Licensor | date | Licensor submission deadline |
-| 👤 Buyer | labels | Buyer name(s) |
-| Revision received | date | ~40% of tasks |
-| Old Statuses | dropdown | ~29% of tasks — migration artifact |
-
----
-
-## 10. What We Are and Aren't Capturing
-
-### Currently capturing ✅
-- Task created, updated, deleted, moved
-- Status transitions with from/to values
-- Assignee added/removed
-- Comments posted
-- Due date changes, priority changes
-- List/folder/space changes
-
-### Not subscribed ❌
-- `taskAttachmentUpdated` — file uploads/removals
-- `taskChecklistItemCompleted` — checklist progress
-- `taskChecklistItemDeleted` — checklist changes
-- `taskLinkedTasksUpdated` — linked task relationship changes
-- `taskDependencyUpdated` — dependency changes
-
-### Known data quality issues
-- `space_id` is NULL on all events — must be joined via `list_space_map`
-- Time tracking API returns 0 entries despite being enabled
-- Members API (`/seat`) returns null
-
----
-
-## 11. Requirements for the New System
+## 12. Requirements for the New System
 
 ### Must-have
 
-**Project-SKU linking**
-Every SKU must belong to a project. Project record carries: buyer, retailer, season, license restrictions, product types, on-shelf date, and PPS-requested date (separate fields — Q21). SKUs inherit project context so designers don't have to look it up.
+**Project-SKU linking** — Every SKU belongs to a project (buyer + retailer + season). Two separate date fields per SKU: on-shelf date and PPS-requested date. SKUs inherit project context so designers don't have to look it up.
 
-**Design library**
-Searchable repository of all preliminary designs — including rejected ones. Filterable by: licensor, license property, product type, season, retailer/buyer. Designs exist independently of buyer selections and can be offered to new buyers without digging through old tasks.
+**Design library** — Searchable repository of all preliminary designs including rejected ones. Filterable by: licensor, license property, product type, season, retailer. Designs exist independently of buyer selections.
 
-**Full 17-stage pipeline tracking**
-All stages from Section 4 as explicit, navigable checkpoints — not free-form status columns. Each stage knows its expected duration per product type (from Section 5).
+**Full 17-stage pipeline tracking** — All stages from Section 5 as explicit checkpoints. Each stage knows its expected duration by product type (Section 10).
 
-**Stage-overdue alerts**
-When a SKU exceeds the SLA time for its current stage (based on product type), surface it to the PM automatically. Also alert when a SKU reaches "Concept Approved" but has no PO and no sample request after a defined wait period.
+**Stage-overdue alerts** — When a SKU exceeds its SLA for the current stage, surface it to the PM automatically. Also alert when a SKU reaches Concept Approved with no PO and no sample request after a defined wait period.
 
-**Pre-submission validation for licensing sheets**
-Block submission to Liz's queue if: Pantone codes are missing, manufacturing specs for the product type are missing. These are the two most common rejection causes she identified.
+**Pre-submission validation** — Block submission to Liz's queue if Pantone codes or manufacturing specs are missing.
 
-**Costing sheet constraints linked at design time** (Q21)
-Designers must be able to see factory production constraints (die lines, color count, printing technique, legal line placement) while they're designing — not discover mismatches at the licensing sheet stage.
+**Costing sheet constraints at design time** — Designers see factory constraints while designing, not after the LS is rejected.
 
-**Batch stage advancement**
-Select multiple SKUs → move them all to the next stage in one action. Jessica currently does this manually one-by-one. (Q13, Q17)
+**Batch stage advancement** — Move multiple SKUs to next stage in one action.
 
-**Real-time incremental upload tracking** (Q17)
-Designers should upload and mark SKUs ready one at a time as they finish them — not batch at the end. PM needs visibility into partial progress (first 5 of 20 art files ready = can start moving those 5 forward).
+**Incremental progress visibility** — Designers mark SKUs ready one at a time; PM sees partial progress as it happens.
 
-**Art Director queue view**
-Dedicated view for Liz: all sheets awaiting her review, sorted by age. Current status: pending review / revision sent back / approved.
+**Creative Director review queue** — All sheets awaiting Liz's review, sorted by age. Status: pending / revision sent / approved.
 
-**Two date fields per SKU** (Q21)
-- On-shelf date (when the product must be in stores)
-- PPS-requested date (when the buyer wants to see the sample)
-These are separate and both drive deadline calculations.
+**Two date fields** — On-shelf date (when product must be in stores) and PPS-requested date (when buyer wants to see sample) — separate fields.
 
-**Change-of-hands history** (Q21)
-When a different designer takes over a SKU, the system records who did what and when.
+**Change-of-hands history** — When a different designer takes over a SKU, the system records who did what and when.
+
+**DAM thumbnail integration** — Thumbnails from the existing DAM (stored on DigitalOcean Spaces S3) displayed in Plane. Full-size files remain on the NAS; Plane shows the thumbnail and the NAS path. No need to re-upload full files.
 
 ### Should-have
 
-**PM dashboard**
-Bottleneck view: where are SKUs stuck and for how long? Designer workload: open assignments per person. Retroactive deadline calculator: given remaining stages and known stage durations, what is the earliest this SKU can reach production approval?
+**PM dashboard** — Bottleneck view, designer workload, retroactive deadline calculator.
 
-**Multi-buyer conflict detection**
-Alert when two active projects select the same design. Trigger at the moment it happens, before the team starts duplicating work.
+**Multi-buyer conflict detection** — Alert when two active projects select the same design.
 
-**Structured revision notes**
-Replace Teams messages + Illustrator markups with in-system revision comments attached to the specific submission. Revision history stays on the SKU card.
+**Structured revision notes** — In-system revision comments attached to the specific submission, replacing Teams messages and Illustrator markups.
 
-**Role-specific views**
-- Designer: my current assignments, my queue
-- Art Director: my review queue
-- PM: all projects, bottlenecks, workload
-- Sales: buyer-facing status only, no internal stage noise
+**Role-specific views** — Designer, Creative Director, PM, Sales each see a tailored workspace.
 
-**Notifications**
-When Art Director approves → notify designer + licensing coordinator. When licensor responds → notify PM + licensing manager. When a stage completes → notify the next person in chain.
+**Notifications** — When Liz approves → notify designer + licensing coordinator. When licensor responds → notify PM + licensing manager.
 
-**List of all projects for a given retailer**
-Jessica specifically requested this as an AI query but it's also a basic filter view need.
+**Wholesale sublicensor channel support** — Stallion Art and Iconick products go through the same licensor approval pipeline but need routing tags / separate views.
 
 ### Nice-to-have
 
-**Designer productivity metrics**
-Designs created vs. buyer picks (pick rate). Revision rate per designer. Average stage completion time. Designer familiarity scores by licensor and retailer (derived from revision rate).
+**Designer productivity metrics** — Pick rate, revision rate, avg stage completion time per designer, licensor familiarity score.
 
-**Natural language queries** (see Section 12 for exact questions requested)
+**Natural language queries** (see Section 13).
 
 ---
 
-## 12. AI Assistant Queries — Verbatim from Jessica
+## 13. AI Assistant Queries — Verbatim from Jessica (Q20)
 
-These are the exact questions Jessica said she would use every week (Q20):
+These are the exact questions she said she would use every week:
 
 1. *"How many SKUs have a licensing sheet but the art director hasn't sent it to the licensing team?"*
 2. *"How many SKUs have techpacks for factory but the art director hasn't confirmed which factory to send to?"*
 3. *"List of all projects for the same retailer (client)"*
 4. *"Which designer created more designs (preliminary or art files) this week?"*
 5. *"Which designer has the least picks from buyers in the last month?"*
-6. *"Summary of this project"* → expected response format: *"Total SKUs 27, 20 are sample requested, 3 concept approved, 4 concept submitted, next action: send the three approved concepts to the factory and wait for the 4 not approved."*
+6. *"Summary of this project"* → expected: *"Total SKUs 27, 20 are sample requested, 3 concept approved, 4 concept submitted, next action: send the three approved concepts to the factory and wait for the 4 not approved."*
 
 ---
 
-## 13. Open Questions
+## 14. Open Questions
 
-1. **Other interviews needed** — Jessica (PM) and Liz (Art Director) are covered. Candidates: a creative designer, a technical designer, the licensing coordinator, someone from Sales. Each would add their perspective on the pipeline.
+**For Jessica (Round 3):**
+- What does "for adam" tag mean? Is it Jessica routing tasks to Adam for sales action, or something else?
+- What is "Product Integrity (PI) Approved"? Only 45 products have this. When is it required?
+- What is "Brand Assurance" checkpoint? When does it apply?
+- What triggers a "Concept Approved" product to finally get a PO and advance — vs sit dormant indefinitely?
+- Some products have been in the pipeline for 4–5 years. Are these actively being worked on, or just never closed?
+- Who creates the costing sheet and when? How does it currently connect to the ClickUp task?
 
-2. **Spruce Line specifics** — All interview data is POP Creations-focused. Does Spruce Line use the same pipeline, a shorter version, or something entirely different?
+**For Liz (Round 3):**
+- What did Sarbani used to approve that Liz now handles? Has the Creative Director role changed since Sarbani left?
+- Do you need full-size design files accessible in the new system, or are thumbnails + NAS path sufficient?
+- What is "Brand Assurance" — do you perform this?
 
-3. **Is time tracking used at all?** — Enabled in ClickUp, 0 entries in the API. Are estimates entered anywhere? Is any time being logged?
+**For Jen (Round 3 — new interview):**
+- Full from-scratch interview on the Spruce Line process
+- How collections/presentations are tracked vs individual SKUs
+- What "Edge Generic" is and how it works
+- Pain points specific to non-licensed product development
+- What tools she'd want that she doesn't have
 
-4. **Factory and retailer master lists** — Custom fields reference factories and retailers. Is there a maintained master list, or is it ad hoc per card? The new system will need this as a first-class entity.
-
-5. **What does a "project brief" look like today?** — Jessica says the project card contains buyer, retailer, season, product types, license restrictions. Is this free-form text or structured fields?
-
-6. **Costing sheet format** — Jessica says designers need access to costing sheet constraints at design time. Where do costing sheets live today? Are they ClickUp attachments, a shared drive, a separate system?
-
-7. **On-shelf date vs. PPS-requested date** — these are now confirmed as two distinct fields. Where does this data come from today — Sales? The buyer directly?
+**Data gaps still open:**
+- `buyer` field in products stores UUIDs, not names — needs resolution
+- Product category only populated for 57 of 9,069 products
+- User table has no names — only from `events` table
+- Time tracking: 0 entries despite being enabled
