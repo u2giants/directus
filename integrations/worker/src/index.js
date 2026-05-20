@@ -244,7 +244,7 @@ async function handleAIQuery(request, env) {
     const raw = await callLLM(apiKey, SCHEMA_CONTEXT, question, 512);
     sql = cleanSQL(raw);
   } catch (err) {
-    return json({ error: 'Claude API error (SQL generation)', message: err.message }, 502);
+    return json({ error: 'LLM API error (SQL generation)', message: err.message }, 502);
   }
 
   if (!sql || !sql.trim().toUpperCase().startsWith('SELECT')) {

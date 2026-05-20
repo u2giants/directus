@@ -2,641 +2,135 @@
 
 ## Start Here
 
-If you are a new AI session or engineer with no prior context, read these first in order:
+If you are a new AI session or developer with no prior context, read these first in order:
 
 1. `FUTURE_SESSION_START_HERE.md`
 2. `BUSINESS_INTELLIGENCE.md`
 3. `HANDOFF.md`
 4. `DATA_ACCESS_GUIDE.md`
 
-The most important current lesson is that the imported ClickUp data is **not** a single flat list of products. It contains at least:
-
-- buyer / retailer / season project cards
-- child SKU execution tasks
-- support and coordination tasks
-
-Do not design the replacement system as if every ClickUp record were the same business object.
-
-Custom self-hosted project management platform built on [Plane](https://github.com/makeplane/plane) (open-source, AGPL-3.0), customized to fit the real workflows of a licensed home decor product company.
-
-**Phase 1 (current): Learning** — passively observing the team's ClickUp behavior for ~14 business days before writing any Plane customization.
-**Phase 2 (upcoming): Build** — deploy Plane on Coolify, customize based on observed behavior, migrate team off ClickUp.
+**Critical context:** The imported ClickUp data is not a flat list of products. It contains buyer/retailer/season project cards, child SKU execution tasks, and support tasks. Do not design the replacement system as if every ClickUp record is the same business object.
 
 ---
 
-## Table of Contents
+Custom self-hosted project management platform built on [Plane](https://github.com/makeplane/plane) (AGPL-3.0), customized to fit the real workflows of a licensed home decor product company.
 
-1. [The Business](#the-business)
-2. [The Core Workflow](#the-core-workflow)
-3. [Infrastructure](#infrastructure)
-4. [Repository Structure](#repository-structure)
-5. [The Learning Phase](#the-learning-phase)
-6. [D1 Database Schema](#d1-database-schema)
-7. [Known Data Quality Issues](#known-data-quality-issues)
-8. [How Learning Phase Data Becomes Plane Features](#how-learning-phase-data-becomes-plane-features)
-9. [How to Query Live Event Data](#how-to-query-live-event-data)
-10. [Plane Production Stack (Build Phase)](#plane-production-stack-build-phase)
-11. [Key Design Decisions](#key-design-decisions)
-12. [Developer Guide — Dos and Don'ts](#developer-guide--dos-and-donts)
-13. [Troubleshooting](#troubleshooting)
-14. [Secrets and Credentials](#secrets-and-credentials)
-15. [Current Status](#current-status)
+**Current phase: Build** — ClickUp behavioral data collected, employee interviews in progress (Round 3). Plane will be deployed and configured once Round 3 interviews are complete.
 
 ---
 
-## The Business
-
-This platform serves a home decor product company with two divisions and an internal dev team:
-
-### Spruce Line
-Non-licensed home decor products. No outside licensor involved.
-**Workflow:** Internal design team → buyer (customer) approval → done.
-Simple, fast, low overhead.
-
-### POP Creations
-Licensed home decor products carrying IP from studios including Disney, Warner Bros, and Paramount.
-**Workflow:** Internal design team → **licensor approval** → buyer approval → done.
-
-The licensor approval process is multi-stage, mandatory at multiple points in the product lifecycle (concept, pre-production, sampling), and the primary source of complexity in this business. Every concept, revision, and pre-production sample must be formally submitted and approved by the licensor before moving forward. This is where work stalls, where follow-ups are required, and where the most process overhead lives.
-
-**Any PM tool that doesn't model licensor approval stages explicitly will fail for POP Creations.**
-
-### designflow
-Internal dev team space. Two developers managing the PLM software project. Separate from the product business — different workflow, different users, different cadence.
-
-### Space / Division Reference
-
-| Space | ID | Type | Key Statuses |
-|-------|----|------|-------------|
-| Spruce Line | `2571984` | Non-licensed products | to do → complete |
-| POP Creations | `4294720` | Licensed products (Disney, WB, Paramount) | 20+ licensor pipeline stages |
-| designflow | `90114122073` | Internal dev team (private) | backlog → scoping → in design → in development → in review → testing → ready for development → shipped → cancelled |
-
-ClickUp Workspace / Team ID: `2298436`
-Webhook registration ID: `b114d599-aa9a-4069-b08f-a4bf0ac4fe20`
-
-### Key numbers (as of March 30, 2026 snapshot)
-- 17,746 total tasks across all spaces
-- 11,561 tasks in the Licensing Management list alone
-- 64 unique users in the system
-- 37% of tasks are subtasks (deep hierarchies are normal)
-- 96% of tasks have no priority set (UI problem — ClickUp buries the field)
-- Time tracking is not used by the team
-
----
-
-## The Core Workflow
-
-The POP Creations licensing pipeline is the heart of this system. Plane must model it explicitly.
+## How the system works
 
 ```
-idea new prod form
-  └─ buyers insight
-       └─ licensor insight
-            └─ concp subm            <- concept submitted to licensor
-                 └─ concp apprv      <- licensor approved concept
-                      ├─ concp apprv comments
-                      └─ revisions
-                           └─ prepro apprvd     <- pre-production approved
-                                └─ prod apprv   <- production approved
-                                     └─ sku created
-                                          └─ smpl req         <- sample requested
-                                               └─ smpl sent lic
-                                                    └─ smpl recvd
-                                                         └─ smpl revision
-                                                              └─ design brief
-                                                                   └─ design in prog
-                                                                        └─ design done
-                                                                             └─ design complete
-                                                                                  └─ ready to submit
-                                                                                       └─ prod creation
-                                                                                            └─ complete
+ClickUp workspace
+  │  webhooks (HMAC-SHA256)
+  ▼
+Cloudflare Worker — plane-integrations.u2giants.workers.dev
+  │  writes to
+  ▼
+Cloudflare D1 — clickup-events (c37aeb36-e16e-416b-b699-c910f6f8dc10)
+  │  raw_events → specialized tables → products (materialized, rebuilt nightly)
+  │
+  ├── POST /query        natural language → SQL → plain English (OpenRouter/deepseek)
+  └── GET  /interview    async Q&A UI for employee interviews
+
+GitHub Actions (nightly)
+  02:00 UTC  clickup-snapshot.yml   → snapshot ClickUp → upload artifacts
+  06:00 UTC  refresh-products.yml   → rebuild products + product_checkpoints tables
 ```
 
-Spruce Line has a much simpler pipeline: `to do → complete` with minimal intermediate states.
+**Source of truth:** GitHub (`main` branch only — see [AI_OPERATING_RULES.md](AI_OPERATING_RULES.md)).
+**Runtime config:** Coolify at `178.156.180.212:8000`.
+**Production runtime:** Cloudflare Worker (auto-deployed on push to `integrations/worker/**`).
 
-### Custom fields in active use
-| Field | Type | Used for |
-|-------|------|---------|
-| SMPL Req | number | Sample request tracking (2,362 tasks) |
-| Revision received | date | When revision came back from licensor |
-| Customer / Retailer | dropdown | Which buyer this is for |
-| Category | dropdown | Product category |
-| Factory | dropdown | Manufacturing source |
-| Buyer | text | Buyer name |
-| Due Date Licensor | date | Licensor-facing deadline |
+---
+
+## Quick commands
+
+```bash
+# Deploy worker manually
+gh workflow run deploy-worker.yml --repo u2giants/plane
+
+# Run a full ClickUp snapshot
+gh workflow run clickup-snapshot.yml --repo u2giants/plane
+
+# Load latest snapshot into D1 + rebuild products table
+gh workflow run load-snapshot-to-d1.yml --repo u2giants/plane
+
+# Rebuild products table only (no new snapshot needed)
+gh workflow run refresh-products.yml --repo u2giants/plane
+
+# Apply schema migration
+gh workflow run migrate-database.yml --repo u2giants/plane
+
+# Check recent workflow runs
+gh run list --repo u2giants/plane --limit 10
+
+# Health check
+curl https://plane-integrations.u2giants.workers.dev/health
+
+# Query D1 directly
+curl -s -X POST \
+  "https://api.cloudflare.com/client/v4/accounts/8303d11002766bf1cc36bf2f07ba6f20/d1/database/c37aeb36-e16e-416b-b699-c910f6f8dc10/query" \
+  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"sql": "SELECT COUNT(*) FROM products WHERE is_internal = 0"}'
+```
+
+---
+
+## Documentation
+
+| File | Contents |
+|------|----------|
+| [docs/architecture.md](docs/architecture.md) | System design, data flow, D1 schema, views |
+| [docs/deployment.md](docs/deployment.md) | Deploy worker, run workflows, schema migration |
+| [docs/configuration.md](docs/configuration.md) | All secrets, env vars, and configurable constants |
+| [docs/development.md](docs/development.md) | Local setup, testing, querying D1, scripts |
+| [FUTURE_SESSION_START_HERE.md](FUTURE_SESSION_START_HERE.md) | Orientation for new AI sessions |
+| [BUSINESS_INTELLIGENCE.md](BUSINESS_INTELLIGENCE.md) | Full business context — pipeline, team, pain points, requirements |
+| [DATA_ACCESS_GUIDE.md](DATA_ACCESS_GUIDE.md) | D1 table reference with sample queries |
+| [HANDOFF.md](HANDOFF.md) | Plane design decisions pending Round 3 interviews |
+| [AI_OPERATING_RULES.md](AI_OPERATING_RULES.md) | Rules for AI working in this repo |
+
+---
+
+## Repository structure
+
+```
+u2giants/plane/
+├── integrations/
+│   └── worker/
+│       ├── src/index.js        Cloudflare Worker (webhook receiver + AI query + interview UI)
+│       └── wrangler.toml       Worker config (account, D1 binding)
+├── scripts/
+│   ├── clickup_snapshot.py     Full ClickUp workspace snapshot (run via GH Actions)
+│   ├── load_snapshot_to_d1.py  Loads snapshot JSON files into D1
+│   ├── build_products_table.py Rebuilds products + product_checkpoints tables
+│   ├── fetch_task_activity.py  Backfills status_transitions from snapshot + ClickUp history API
+│   ├── migrate_robust_schema.sql  Full D1 schema (idempotent — safe to re-run)
+│   └── analysis/               Periodic behavioral analysis reports
+├── .github/workflows/          All CI/CD and operational workflows
+├── .githooks/post-checkout     Enforces single-branch policy (main only)
+├── docs/                       Developer documentation
+└── CLAUDE.md                   Claude Code session context (MCP tool names, credentials)
+```
 
 ---
 
 ## Infrastructure
 
-```
-GitHub (u2giants/plane)
-    |  source of truth -- all code lives here, CI/CD from here
-    |
-    +-- Cloudflare
-    |     +-- Worker: plane-integrations
-    |     |     URL: https://plane-integrations.u2giants.workers.dev
-    |     |     Receives ClickUp webhooks -> validates HMAC -> writes to D1
-    |     |
-    |     +-- D1: clickup-events
-    |     |     ID: c37aeb36-e16e-416b-b699-c910f6f8dc10
-    |     |     SQLite -- stores every ClickUp event during learning phase
-    |     |     Tables: events, list_space_map
-    |     |
-    |     +-- Cloudflare Account ID: 8303d11002766bf1cc36bf2f07ba6f20
-    |     |
-    |     +-- R2: plane-uploads (future)
-    |           Replaces Plane's bundled MinIO for file storage
-    |
-    +-- Coolify server: 178.156.180.212:8000
-          8 vCPU / 16 GB RAM / 240 GB disk
-          +-- Twenty (CRM) -- running
-          +-- OpenClaw -- running
-          +-- Plane -- coming in build phase
-```
-
-### Coolify worksp directory convention
-Every application on this Coolify server follows the same pattern:
-```
-/worksp/{appname}/              <- real directory
-  {service-name}                <- symlink -> /data/coolify/applications/{UUID}/
-```
-
-Existing examples:
-```
-/worksp/openclaw/
-  ocgate    -> /data/coolify/applications/yxz0hmaien0bgn0sv64g8q3p/
-  ocmc      -> /data/coolify/applications/jihoc2f68xmgi2gfomhhr9g3/
-
-/worksp/twenty/
-  twenty-server -> /data/coolify/applications/rd261bt0wy7ifjrkoe1tkl92/
-  twenty-worker -> /data/coolify/applications/pkhhmt4r7n0xt25jmmlkkfi8/
-
-/worksp/plane/                  <- exists, empty -- symlinks added when apps are created
-```
-
-**This pattern is mandatory.** Always create the real directory first, then add symlinks as Coolify apps are created. Never put code directly on the server.
+| Component | Location | Notes |
+|-----------|----------|-------|
+| Cloudflare Worker | `plane-integrations` | Auto-deploys from `integrations/worker/**` on push to `main` |
+| Cloudflare D1 | `clickup-events` | SQLite; ID `c37aeb36-e16e-416b-b699-c910f6f8dc10` |
+| Cloudflare Account | `8303d11002766bf1cc36bf2f07ba6f20` | `u2giants` |
+| Coolify server | `178.156.180.212:8000` | 8 vCPU / 16 GB / 240 GB; manages Plane runtime |
+| ClickUp workspace | Team ID `2298436` | Source of product data |
+| Webhook ID | `b114d599-aa9a-4069-b08f-a4bf0ac4fe20` | Active; 22 event types subscribed |
 
 ---
 
-## Repository Structure
+## AGPL-3.0 note
 
-```
-u2giants/plane/
-|
-+-- README.md                          <- you are here -- universal project guide
-+-- CLAUDE.md                          <- Claude Code specific additions (MCP tool names, etc.)
-+-- .gitignore
-|
-+-- .github/
-|   +-- workflows/
-|       +-- deploy-worker.yml          <- auto-deploys Worker on every push to main
-|       |                                 (path-filtered: only fires on integrations/worker/**)
-|       +-- clickup-snapshot.yml       <- manual dispatch -- full ClickUp API snapshot
-|                                         trigger: gh workflow run clickup-snapshot.yml
-|
-+-- integrations/
-|   +-- worker/
-|       +-- src/
-|       |   +-- index.js               <- Cloudflare Worker
-|       |                                 - POST /clickup/webhook: receives events, validates
-|       |                                   HMAC-SHA256, extracts enriched fields, writes to D1
-|       |                                 - GET /health: returns {"status":"ok","ts":"..."}
-|       +-- wrangler.toml              <- Cloudflare config: account ID, D1 binding, worker name
-|
-+-- scripts/
-    +-- clickup_snapshot.py            <- full workspace snapshot (run via GH Actions)
-    +-- populate_list_space_map.py     <- one-time: reads snapshot files, prints SQL to
-    |                                     populate D1 list_space_map table
-    +-- analysis/
-        +-- checkin_YYYY-MM-DD.md     <- periodic behavioral analysis reports
-```
-
----
-
-## The Learning Phase
-
-Before customizing Plane, we need to know exactly how the team works — not how we assume they work.
-
-### Why extend to Apr 29?
-The webhook was suspended for 13 days (Apr 1–14) due to an HMAC secret mismatch, eliminating the planned observation window. The system was repaired and re-enabled on Apr 14. The learning phase is extended to **Apr 29** to collect a full 10+ business days of clean behavioral data. Analysis will not run until that window closes.
-
-### Two data sources
-
-#### 1. Structural snapshot (point-in-time)
-Run `gh workflow run clickup-snapshot.yml` to pull the full state of the ClickUp workspace. Captures:
-- All workspaces, spaces, folders, lists
-- All tasks including subtasks, custom fields, checklists, dependency graph
-- Members and roles (via `/team/{id}/seat`)
-- Views, tags, goals
-- Time tracking history (last 90 days)
-- Comments (sample of 200 most-recently-updated tasks)
-- Docs/pages (if available on plan tier)
-
-Artifacts are stored in GitHub Actions and retained for 30 days.
-
-#### 2. Behavioral stream (continuous)
-A Cloudflare Worker receives every ClickUp webhook event in real time. Events are written to D1 immediately. No polling, no batch jobs — everything is event-driven.
-
-**22 webhook event types subscribed:**
-```
-taskCreated          taskUpdated          taskDeleted
-taskMoved            taskCommentPosted    taskCommentUpdated
-taskAssigneeUpdated  taskStatusUpdated    taskTimeEstimateUpdated
-taskTimeTrackedUpdated  taskPriorityUpdated  taskDueDateUpdated
-taskTagUpdated       listCreated          listUpdated
-listDeleted          folderCreated        folderUpdated
-folderDeleted        spaceCreated         spaceUpdated
-spaceDeleted
-```
-
-All events are HMAC-SHA256 validated. The Worker rejects any request with a missing or invalid `X-Signature` header.
-
-**Note on duplicate events:** ClickUp fires `taskUpdated` for every change AND the specific event type simultaneously. One status change = 2 rows in D1 (`taskStatusUpdated` + `taskUpdated`). This is expected behavior, not a bug. Use `WHERE event_type != 'taskUpdated'` for unique-action counts.
-
-### Analysis schedule
-
-| Date | What | Purpose |
-|------|------|---------|
-| Apr 1, 2026 | ~~First check-in~~ | Skipped — webhook was suspended; no usable data |
-| Apr 14, 2026 | Webhook repaired | System back online; clean data collection begins |
-| ~Apr 22 | Mid-point check-in | ~6 business days of data — verify capture quality, early patterns |
-| ~Apr 29 | Final analysis | Full 10-day picture + Plane customization roadmap — this drives all build decisions |
-
-Reports are saved to `scripts/analysis/checkin_YYYY-MM-DD.md`.
-
----
-
-## D1 Database Schema
-
-### events table
-```sql
-CREATE TABLE events (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  event_type    TEXT NOT NULL,     -- e.g. 'taskStatusUpdated'
-  task_id       TEXT,              -- ClickUp task ID
-  list_id       TEXT,              -- ClickUp list ID (from history_items[0].parent_id)
-  workspace_id  TEXT,              -- ClickUp team ID (payload.team_id)
-  payload       TEXT NOT NULL,     -- full raw JSON from ClickUp -- NEVER truncate this
-  received_at   TEXT NOT NULL DEFAULT (datetime('now')),
-  processed     INTEGER DEFAULT 0,
-
-  -- enriched columns extracted from history_items[0] by the Worker
-  user_id       TEXT,              -- who made the change
-  user_name     TEXT,              -- display name
-  field_changed TEXT,              -- e.g. 'status', 'priority', 'assignee', 'due_date'
-  from_value    TEXT,              -- previous value (JSON-stringified for complex types)
-  to_value      TEXT,              -- new value
-  space_id      TEXT               -- which space (derive via JOIN to list_space_map)
-);
-
-CREATE INDEX idx_event_type  ON events(event_type);
-CREATE INDEX idx_task_id     ON events(task_id);
-CREATE INDEX idx_received_at ON events(received_at);
-```
-
-**Always store the full raw `payload`.** The enriched columns are query conveniences. Raw data is ground truth and allows re-processing if the enrichment logic has bugs.
-
-### list_space_map table
-```sql
-CREATE TABLE list_space_map (
-  list_id     TEXT PRIMARY KEY,
-  list_name   TEXT,
-  space_id    TEXT,   -- join to events.list_id to get division context
-  space_name  TEXT,   -- 'Spruce Line', 'POP Creations', or 'designflow'
-  folder_id   TEXT,
-  folder_name TEXT
-);
-```
-
-ClickUp webhook payloads never include `space_id` directly. To know which division an event came from, you must `JOIN events ON list_space_map`. This table is populated from the snapshot data using `scripts/populate_list_space_map.py`. **As of Apr 14 this table is populated with 21 lists across 3 spaces.**
-
-Division-aware query pattern:
-```sql
-SELECT m.space_name, e.event_type, COUNT(*) as cnt
-FROM events e
-LEFT JOIN list_space_map m ON e.list_id = m.list_id
-GROUP BY m.space_name, e.event_type
-ORDER BY m.space_name, cnt DESC
-```
-
----
-
-## Known Data Quality Issues
-
-### ✅ All three Worker bugs resolved — Apr 14, 2026
-
-Three extraction bugs were discovered during an Apr 1 audit and fully resolved on Apr 14:
-
-| Field | Issue | Resolution |
-|-------|-------|-----------|
-| `events.list_id` | Was always NULL — Worker looked for `item.data.list_id` (doesn't exist) | Fixed: now extracted from `history_items[0].parent_id`. All 52 historical rows backfilled. |
-| `events.space_id` | Always NULL — ClickUp webhooks don't include space_id | By design: use `JOIN list_space_map` on `list_id` to get division context. |
-| `events.workspace_id` | Was storing webhook registration ID (`b114d599-...`) instead of team ID | Fixed: now extracted from `payload.team_id`. All 52 historical rows backfilled. Correct value: `2298436`. |
-
-All columns are now reliable. Division-aware queries using `LEFT JOIN list_space_map m ON e.list_id = m.list_id` work correctly against all rows.
-
-### Duplicate events (expected, not a bug)
-ClickUp fires `taskUpdated` for every change AND the specific event type. A single status change produces two rows:
-- `taskStatusUpdated` with `field_changed='status'`
-- `taskUpdated` with `field_changed='status'` (identical content)
-
-**For unique-action analysis:** `WHERE event_type != 'taskUpdated'`
-**For total volume/activity:** count all rows (both are valid signals of team activity)
-
----
-
-## How Learning Phase Data Becomes Plane Features
-
-Every piece of data we capture maps directly to a Plane configuration decision. This is not an academic exercise.
-
-| Data captured | Question it answers | Plane decision it drives |
-|--------------|--------------------|-----------------------------|
-| Status transitions (from_value → to_value) | Which workflow stages actually get used vs. exist only in theory? | Which custom statuses to create per space in Plane |
-| Skipped/unused statuses | What can we eliminate from the pipeline? | Simplified status set — fewer choices = fewer mistakes |
-| Active hours (received_at patterns) | When is the team actually working? | Notification scheduling, SLA window definition |
-| user_name activity counts | Who are power users vs. occasional users? | Default assignee logic, Plane onboarding priority |
-| field_changed distribution | Which fields actually get updated? | Which fields to surface prominently in Plane UI |
-| Priority = 96% empty | Is this a culture problem or a UI problem? | Confirmed UI problem — surface priority directly in list row, not buried in task detail panel |
-| Spruce vs POP event distribution | Are workflows actually different day-to-day? | Whether to use separate Plane projects or a single project with label-based routing |
-| taskCommentPosted frequency | How much communication happens inside tasks? | Whether to configure aggressive comment notifications or keep async |
-| taskTimeTrackedUpdated count (expected: 0) | Does the team actually track time? | If 0: don't configure time tracking in Plane — it will be ignored |
-| Licensor-stage status transitions | How many approval rounds actually happen in practice? | How many licensor stages to model in Plane (trim theoretical pipeline to actual usage) |
-| taskMoved events | Do tasks cross lists/spaces frequently? | Whether to build cross-space task linking in Plane |
-| Subtask creation patterns | How deep do hierarchies get? | Plane's subtask depth limit configuration |
-
----
-
-## How to Query Live Event Data
-
-### Via Cloudflare REST API (works from any tool without MCP)
-```bash
-curl -s -X POST \
-  "https://api.cloudflare.com/client/v4/accounts/8303d11002766bf1cc36bf2f07ba6f20/d1/database/c37aeb36-e16e-416b-b699-c910f6f8dc10/query" \
-  -H "Authorization: Bearer cfut_qlhKZXlVmVaBTz5RpAPJhj7jRJyRo6v7LeCDDELG62a50c0a" \
-  -H "Content-Type: application/json" \
-  -d '{"sql": "SELECT event_type, COUNT(*) as count FROM events WHERE event_type != '\''test'\'' GROUP BY event_type ORDER BY count DESC"}'
-```
-Response shape: `{"result": [{"results": [...], "success": true}]}`
-
-### Useful analysis queries
-
-**Events by type (unique actions only):**
-```sql
-SELECT event_type, COUNT(*) as cnt
-FROM events
-WHERE event_type NOT IN ('test', 'taskUpdated')
-GROUP BY event_type ORDER BY cnt DESC
-```
-
-**Status transitions (core workflow map):**
-```sql
-SELECT from_value, to_value, COUNT(*) as transitions
-FROM events
-WHERE event_type = 'taskStatusUpdated'
-  AND from_value IS NOT NULL AND to_value IS NOT NULL
-GROUP BY from_value, to_value
-ORDER BY transitions DESC LIMIT 30
-```
-
-**Most active users:**
-```sql
-SELECT user_name, COUNT(*) as actions
-FROM events
-WHERE user_name IS NOT NULL AND event_type NOT IN ('test', 'taskUpdated')
-GROUP BY user_name ORDER BY actions DESC
-```
-
-**Activity by hour (UTC — Eastern = UTC-4 in summer, UTC-5 in winter):**
-```sql
-SELECT CAST(strftime('%H', received_at) AS INTEGER) as hour_utc,
-       COUNT(*) as events
-FROM events WHERE event_type != 'test'
-GROUP BY hour_utc ORDER BY hour_utc
-```
-
-**Fields that actually get changed:**
-```sql
-SELECT field_changed, COUNT(*) as cnt
-FROM events
-WHERE field_changed IS NOT NULL AND event_type != 'test'
-GROUP BY field_changed ORDER BY cnt DESC
-```
-
-**Division breakdown (requires list_space_map to be populated):**
-```sql
-SELECT m.space_name, COUNT(*) as events
-FROM events e
-LEFT JOIN list_space_map m ON e.list_id = m.list_id
-WHERE e.event_type NOT IN ('test', 'taskUpdated')
-GROUP BY m.space_name
-```
-
-**Note:** Filter out the pipeline test event with `WHERE event_type != 'test'` in all analysis queries (event id=1 is a pipeline verification record — do not delete it).
-
----
-
-## Plane Production Stack (Build Phase)
-
-When learning phase is complete and analysis is done, Plane will be deployed on Coolify. Key decisions already made:
-
-| Component | Decision | Reason |
-|-----------|----------|--------|
-| File storage | Cloudflare R2 (not bundled MinIO) | No egress fees, removes one container, frees disk |
-| PostgreSQL | Bundled (Plane default) | No reason to externalize |
-| Redis/Valkey | Bundled (Plane default) | Same |
-| RabbitMQ | Bundled (Plane default) | Same |
-| Gunicorn workers | Set to 2 (`GUNICORN_WORKERS=2`) | Shared server — prevents OOM with Twenty + OpenClaw |
-| Reverse proxy | Coolify-managed Caddy | Automatic SSL, consistent with other apps |
-
-**R2 configuration** (replaces MinIO entirely with 3 env vars):
-```
-AWS_S3_ENDPOINT_URL=https://8303d11002766bf1cc36bf2f07ba6f20.r2.cloudflarestorage.com
-AWS_ACCESS_KEY_ID={r2_access_key}
-AWS_SECRET_ACCESS_KEY={r2_secret_key}
-AWS_S3_BUCKET_NAME=plane-uploads
-```
-
-Remove the `plane-minio` service from the docker-compose before deploying. Plane uses `django-storages` with boto3 — it picks up S3-compatible config automatically.
-
----
-
-## Key Design Decisions
-
-### Why observe first, then build?
-PM platforms fail when they're designed around what management thinks the team does, not what the team actually does. 14 days of behavioral data costs almost nothing and makes every Plane customization decision evidence-based rather than guesswork.
-
-### Why Cloudflare (Worker + D1) for learning phase?
-- D1 is free at this event volume
-- Worker is serverless — zero infrastructure to maintain, globally available instantly
-- Both become permanent infrastructure: Worker evolves into the integration hub for Plane and external tools, D1 becomes the audit/integration event log
-- Nothing from this phase is throwaway
-
-### Why not Supabase or an external database?
-Plane already bundles PostgreSQL, real-time (Hocuspocus), and auth. Adding Supabase would duplicate all of that at extra cost with no benefit. Cloudflare D1 is sufficient for the event log use case.
-
-### Why store raw webhook payload AND enriched columns?
-ClickUp's webhook structure is partially undocumented and changes over time. The enriched columns (user_name, from_value, to_value) enable fast SQL analysis without JSON parsing. The raw payload is the source of truth. If enrichment has a bug (and it did — see Known Issues), raw data allows re-processing without losing any history.
-
-### Why is priority 96% empty?
-ClickUp's UI buries the priority selector inside the task detail panel — it's not visible in list view. The team doesn't use it because they can't easily see or set it. This is a UI problem, not a team culture problem. The Plane build must surface priority directly in task list rows. Confirmed by team lead as a known pain point.
-
-### AGPL-3.0 licensing
-Plane is AGPL-3.0. For internal deployments (one company using their own instance), this has no practical impact. If the platform is ever offered as a service to other companies, those customizations must be open-sourced. Get legal confirmation before building any multi-tenant or white-label features on top of Plane.
-
----
-
-## Developer Guide — Dos and Don'ts
-
-### Day one checklist
-1. Read this README fully
-2. Check current event flow: query D1 for recent events
-3. Review the latest analysis report in `scripts/analysis/`
-4. Look at `integrations/worker/src/index.js` to understand what's being extracted
-5. Check `gh run list --repo u2giants/plane` to see recent CI/CD activity
-6. Read the Known Issues section above before writing any queries
-
-### DO
-
-- **Always store the full raw `payload`** — enriched columns are conveniences, raw is ground truth
-- **Filter `WHERE event_type != 'test'`** in analysis queries (row id=1 is a pipeline verification record)
-- **Use LEFT JOIN with list_space_map** for any division-aware query: `JOIN list_space_map m ON e.list_id = m.list_id`
-- **Run snapshots via GitHub Actions** (`gh workflow run clickup-snapshot.yml`) — ensures consistent credentials and artifacts are properly stored
-- **Push to `main` to deploy the Worker** — the `deploy-worker.yml` workflow fires automatically; don't deploy via wrangler CLI locally
-- **Verify Worker after every deploy:** `curl https://plane-integrations.u2giants.workers.dev/health`
-- **Follow the Coolify worksp pattern** for every new application (check `/worksp/openclaw/` as reference)
-- **Return `200 ok` quickly from the Worker** — ClickUp will retry failed webhooks and mark the endpoint unhealthy after repeated failures
-
-### DON'T
-
-- **Don't delete the test event (id=1)** — it exists as a pipeline verification record
-- **Don't use `space_id` column directly** — ClickUp webhooks never include it; derive via `JOIN list_space_map m ON e.list_id = m.list_id`
-- **Don't count `taskUpdated` as unique actions** — it double-fires alongside every specific event type; use `WHERE event_type != 'taskUpdated'` for action counts
-- **Don't edit code directly on the Coolify server** — GitHub is the source of truth, always
-- **Don't run the snapshot locally against production** — use GitHub Actions; local runs don't store artifacts and use developer-local credentials
-- **Don't add time tracking in Plane at launch** — the team doesn't use it (zero time tracking events in ClickUp data); it will be ignored
-- **Don't add priority enforcement in Plane at launch** — fix the UI visibility first; enforcement without visibility creates frustration
-- **Don't assume ClickUp webhook payloads are complete** — many fields aren't present; always verify against the raw `payload` column before concluding a field doesn't exist
-- **Don't deploy Plane** until the learning phase ends (~Apr 29) and final analysis is complete — the analysis drives all customization decisions
-
-### When touching the Worker
-- `list_id` uses `history_items[0].parent_id` — not `item.data.list_id` (that path doesn't exist in real payloads)
-- Test HMAC locally before pushing: compute `HMAC-SHA256(payload, secret)` and verify it matches `X-Signature`
-- The Worker must respond `200 ok` quickly — ClickUp marks endpoints unhealthy after repeated failures
-
-### When touching the snapshot script
-- The script is designed to run 7–15 minutes on a large workspace — don't add unbounded loops
-- Rate limiting: ClickUp allows 100 req/s on paid plans; the script deliberately sleeps to be polite
-- Comments are sampled (top 200 most-recently-updated tasks) — full comment history for 11K+ tasks would require hours and thousands of API calls
-
-### ClickUp API reference
-- Base URL: `https://api.clickup.com/api/v2`
-- Auth header: `Authorization: pk_4384255_...` (token directly — no "Bearer" prefix)
-- Workspace/Team ID: `2298436`
-- Rate limit: 100 req/s (paid plan). The script respects this with `time.sleep(0.2–0.3)` between calls.
-
----
-
-## Troubleshooting
-
-**"Cloudflare dashboard shows 40+ requests but D1 has fewer events"**
-Some requests are rejected before writing to D1 (HMAC validation failure, malformed JSON). The gap is normal. Rejected requests are logged via `console.warn` in the Worker — check Cloudflare Worker logs for details.
-
-**"space_id is NULL for all events"**
-By design — ClickUp webhooks never include space_id in the payload. Use `LEFT JOIN list_space_map m ON e.list_id = m.list_id` to get division context. Do not query `space_id` directly.
-
-**"list_id is NULL for old events"**
-This was a Worker bug (fixed Apr 14). All historical rows were backfilled. If you see NULLs, the event either pre-dates the fix and was missed in the backfill, or the payload had no `history_items[0].parent_id`.
-
-**"workspace_id column has a UUID that looks like a webhook ID"**
-This was a Worker bug (fixed Apr 14). All historical rows were backfilled with the correct team ID (`2298436`). If you see the old UUID (`b114d599-...`), something is wrong.
-
-**"taskUpdated events dominate the event count"**
-Expected behavior. ClickUp fires `taskUpdated` for every change type AND fires the specific event (e.g., `taskStatusUpdated`). Filter with `WHERE event_type != 'taskUpdated'` for unique-action analysis.
-
-**"Workers onboarding URL returns 404"**
-The `/workers/onboarding` URL is deprecated. Navigate to Workers & Pages in the Cloudflare dashboard sidebar. Correct Worker URL: `https://dash.cloudflare.com/8303d11002766bf1cc36bf2f07ba6f20/workers/services/view/plane-integrations/production`
-
-**"Coolify terminal is inaccessible via automation"**
-Coolify's UI uses Livewire which blocks standard JS automation. Use the Coolify REST API directly (`curl http://178.156.180.212:8000/api/v1/...`) for everything possible. For commands that truly require a terminal, ask the user to run them manually — they take seconds.
-
----
-
-## Secrets and Credentials
-
-**Nothing sensitive is committed to this repo.** All secrets live in GitHub Actions and Cloudflare.
-
-| Secret | Stored in | Purpose |
-|--------|-----------|---------|
-| `CLOUDFLARE_API_TOKEN` | GitHub Actions secrets | Deploys Worker via Wrangler |
-| `CLICKUP_TOKEN` | GitHub Actions secrets | ClickUp API access for snapshots |
-| `CLICKUP_WORKSPACE_ID` | GitHub Actions secrets | ClickUp workspace ID (`2298436`) |
-| `CLICKUP_WEBHOOK_SECRET` | GitHub Actions secrets + CF Worker secret | HMAC validation of incoming webhooks |
-
-To add or rotate a secret:
-```bash
-gh secret set SECRET_NAME --repo u2giants/plane --body "value"
-```
-
-The `CLICKUP_WEBHOOK_SECRET` also needs to be set as a Cloudflare Worker secret. This is done automatically by the `deploy-worker.yml` workflow on every deploy via `wrangler secret put`.
-
----
-
-## Current Status
-
-### ✅ What's Done (Apr 14, 2026)
-
-- ✅ Robust D1 schema: 15 tables + 4 analysis views with 25+ indexes
-- ✅ Worker deployed with HMAC validation + custom field update parsing
-- ✅ list_space_map populated: POP Creations, Spruce Line, designflow (21 lists)
-- ✅ Full workspace snapshot: 17,751 tasks, 495 linked tasks, 7,184 checklists
-- ✅ Webhook capturing: status, assignee, priority, due date, tag, and custom field changes
-- ✅ Worker bugs fixed: list_id (parent_id), workspace_id (team_id) — all 52 historical rows backfilled
-- ✅ Webhook re-enabled after 13-day suspension (Apr 1–14); confirmed live with fail_count: 0
-- ✅ New Cloudflare API token issued and stored in GitHub Secrets (previous token was invalidated)
-
-### ⏳ What's Next
-
-| Phase | What | When |
-|-------|------|------|
-| **Learning (extended)** | Extended observation window — 13-day outage required extension | Apr 14 → Apr 29 |
-| **Checkpoint** | Mid-point analysis (~6 business days of data) | ~Apr 22 |
-| **Final analysis** | Full picture + Plane customization roadmap | ~Apr 29 |
-| **Build** | Deploy Plane on Coolify, customize | After Apr 29 |
-
-### 🔗 Monitoring URLs
-
-- **GitHub Actions:** https://github.com/u2giants/plane/actions
-- **Worker logs:** https://dash.cloudflare.com/8303d11002766bf1cc36bf2f07ba6f20/workers/services/view/plane-integrations/production/logs
-- **Snapshot artifacts:** https://github.com/u2giants/plane/actions/runs/23873776551/artifacts
-- **Health check:** `curl https://plane-integrations.u2giants.workers.dev/health`
-
-### 🔍 Quick Query Commands
-
-```bash
-# Total events (exclude test)
-curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/8303d11002766bf1cc36bf2f07ba6f20/d1/database/c37aeb36-e16e-416b-b699-c910f6f8dc10/query" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"sql": "SELECT COUNT(*) as total FROM events WHERE event_type != '\''test'\''"}'
-
-# Events by division (requires list_space_map)
-curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/8303d11002766bf1cc36bf2f07ba6f20/d1/database/c37aeb36-e16e-416b-b699-c910f6f8dc10/query" \
-  -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"sql": "SELECT m.space_name, COUNT(*) as events FROM events e LEFT JOIN list_space_map m ON e.list_id = m.list_id WHERE e.event_type != '\''test'\'' GROUP BY m.space_name"}'
-```
-
-| Component | Status | Last Updated |
-|-----------|--------|--------------|
-| GitHub repo | ✅ Live | — |
-| Cloudflare Worker | ✅ Live + bugs fixed (list_id, workspace_id) | Apr 14, 2026 |
-| D1 Schema (robust) | ✅ 15 tables + views created | Apr 1, 2026 |
-| D1 Migration | ✅ Completed via GitHub Actions | Apr 1, 2026 |
-| D1 Historical backfill | ✅ 52 rows backfilled (list_id, workspace_id) | Apr 14, 2026 |
-| ClickUp Webhook | ✅ Live — 22 event types, fail_count: 0 | Apr 14, 2026 |
-| list_space_map | ✅ POPULATED — 21 lists → 3 spaces | Apr 1, 2026 |
-| ClickUp Snapshot | ✅ 17,751 tasks captured | Apr 1, 2026 |
-| Coolify `/worksp/plane/` | ✅ Ready (empty) | — |
-| Build Phase | ⏳ Waiting — starts after final analysis (~Apr 29) | — |
+Plane is AGPL-3.0. Internal single-company use has no practical impact. If this platform is ever offered as a service to other companies, customizations must be open-sourced.
