@@ -1,7 +1,9 @@
 # Business Intelligence — POP Creations / Spruce Line PM Platform
 
-**Last updated:** 2026-05-19  
-**Sources:** Direct Cloudflare D1 analysis, live D1 webhook events (Mar 30 – May 19, 2026), ClickUp snapshot imports, employee interviews (Jessica and Liz answered; Jen pending), owner context.
+**Last updated:** 2026-05-28  
+**Sources:** Direct Cloudflare D1 analysis, live D1 webhook events (Mar 30 – May 19, 2026), ClickUp snapshot imports, employee interviews (Jessica Rounds 1 & 3 complete, Liz Round 2 complete; Jen pending), owner context.
+
+**Interview synthesis:** See `docs/interview-synthesis.md` for the full translation of all 43 interview answers into concrete system requirements and design decisions. That document supersedes the open questions below for everything covered in Rounds 1–3.
 
 **Read this with caution:** this document is a synthesis, not the raw source of truth. It is useful, but it does not replace direct D1 inspection. The most important structural fact learned from the live data is that the current ClickUp system mixes **project cards** and **SKU execution tasks**, and that distinction should drive the design of the replacement system.
 
@@ -558,34 +560,27 @@ These are the exact questions she said she would use every week:
 
 ## 14. Open Questions
 
-**For Jessica (Round 3):**
-- What does "for adam" tag mean? Is it Jessica routing tasks to Adam for sales action, or something else?
-- What is "Product Integrity (PI) Approved"? Only 45 products have this. When is it required?
-- What is "Brand Assurance" checkpoint? When does it apply?
-- What triggers a "Concept Approved" product to finally get a PO and advance — vs sit dormant indefinitely?
-- Some products have been in the pipeline for 4–5 years. Are these actively being worked on, or just never closed?
-- Who creates the costing sheet and when? How does it currently connect to the ClickUp task?
-- What exact business event creates a child SKU under a project card?
-- If a design is reused or adapted for another buyer, should that be the same SKU, a linked derivative, or a separate SKU?
+**Resolved in Rounds 1–3 (see `docs/interview-synthesis.md` for full answers):**
+- ✅ "for adam" tag — outdated. All client designs go to sales; tag is no longer meaningful
+- ✅ PI Approval — required by some licensors only; needs "Not Required" option per-licensor
+- ✅ Brand Assurance — submission number from licensor portal; also required for shipping compliance
+- ✅ Concept Approved dormant products — buyers passed on them; should be surfaced as reusable design inventory
+- ✅ Products open 4–5 years — never formally closed; cancel state with required reason is needed
+- ✅ Costing sheet creation — technical designer creates, art director approves, sourcing team confirms
+- ✅ SKU creation trigger — anything requiring licensor submission (not just buyer picks)
+- ✅ SKU reuse across buyers — same SKU, same code (licensor approval record), show order history
 
-**For Liz (Round 3):**
-- What did Sarbani used to approve that Liz now handles? Has the Creative Director role changed since Sarbani left?
-- Do you need full-size design files accessible in the new system, or are thumbnails + NAS path sufficient?
-- What is "Brand Assurance" — do you perform this?
-
-**For Jen (Round 3 — new interview):**
+**For Jen (not yet interviewed — Spruce Line still provisional):**
 - Full from-scratch interview on the Spruce Line process
 - How collections/presentations are tracked vs individual SKUs
 - What "Edge Generic" is and how it works
 - Pain points specific to non-licensed product development
-- What tools she'd want that she doesn't have
-- When a Spruce design is reused for multiple buyers, should that reuse be modeled as duplicate, derivative, or same record?
-- If only part of a Spruce collection is selected, what should become the execution unit in the new system: project, collection, or SKU?
+- When a Spruce design is reused for multiple buyers: duplicate, derivative, or same record?
+- If only part of a collection is selected: what is the execution unit — project, collection, or SKU?
 
 **Data gaps still open:**
 - `buyer` field in products stores UUIDs, not names — needs resolution
 - Product category only populated for 57 of 9,069 products
 - Field coverage is generally sparse (`retailer` 200 / 9,051, `buyer` 17 / 9,051, `product_category` 57 / 9,051)
-- Comments are much sparser than earlier summaries implied
 - The `products` table should not be treated as a perfect one-row-per-business-product truth layer
 - Time tracking: 0 entries despite being enabled

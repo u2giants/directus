@@ -1,398 +1,263 @@
-# Handoff — Designing Plane Around the Business Process
+# Handoff — Session 2026-05-28/29
 
-**Repo:** `u2giants/plane`  
-**Date:** 2026-05-18  
-**Purpose:** Complete context for a new AI session focused exclusively on designing the Plane PM system for this company's real workflows.
+**Repo:** `u2giants/plane`
+**Written:** 2026-05-29
+**Replaces:** the 2026-05-18 HANDOFF.md (kept for reference in git history)
 
-This handoff is intentionally scoped. The AI interview system lives in a separate repo (`u2giants/bizanalysis`). This session is only about designing Plane.
-
-**Read this after** `FUTURE_SESSION_START_HERE.md`. That file contains the clearest current summary for a completely new session.
+This file is the authoritative starting point for any new AI session or developer. Read it before opening any other file.
 
 ---
 
 ## What This Project Is
 
-The company currently tracks all product work in **ClickUp**. The goal is to replace ClickUp with a self-hosted instance of **[Plane](https://github.com/makeplane/plane)** (open-source PM tool, AGPL-3.0), customized to fit how this company actually works.
+**POP Creations / Spruce Line** is a licensed and generic home decor company that manufactures products in China and sells to US retail chains (Burlington, TJX, Ross, Hobby Lobby, Walmart, Dollar General, and others).
 
-Plane is already deployed on Coolify (production server: `178.156.180.212`). The deployment infrastructure is working. The open task is **figuring out how to design Plane's workspace, projects, states, and workflows to match the real business process** — not generic PM defaults.
-
-The ClickUp behavior data has already been collected and loaded into D1. The design work is to use that intelligence to make decisions about the Plane configuration.
-
----
-
-## The Company in One Page
-
-**POP Creations / Spruce Line** — licensed and generic home decor products.  
-Manufactured in China. Sold to US retail chains: Burlington, TJX, Ross, Hobby Lobby, Walmart, etc.
+The company currently tracks all product work in **ClickUp**. The goal is to replace ClickUp with a custom-built PM system designed specifically around how this company works — not a generic reconfiguration of an off-the-shelf tool.
 
 **Two product lines with fundamentally different workflows:**
 
 | | POP Creations | Spruce Line |
 |---|---|---|
-| Products | Licensed (Disney, Marvel, WB, DC, Peanuts, etc.) | Generic / original designs ("Edge" brand) |
-| Volume | ~7,900 SKUs tracked | ~700 items tracked |
-| Key constraint | Must get licensor approval of design AND sample before manufacturing | No licensor — internal approval only |
-| Pipeline complexity | 17 stages, multiple external gates | Simpler; stages not fully mapped yet |
-| ClickUp list | Licensing Management (7,281 products) | Edge Generic (701 products) |
+| Nature | Licensed (Disney, Marvel, WB, DC, Peanuts, etc.) | Generic / original designs |
+| Volume | ~8,000 SKUs | ~700 items |
+| Key constraint | Licensor approval of concept AND sample before manufacturing | No licensor — internal approval only |
+| Pipeline | 17 confirmed stages | Not fully mapped — waiting on Jen's interview |
+| Contact | Jessica (PM), Liz (Creative Director) | Jen (Creative Director) |
 
-**Three ways work starts:**
-1. Buyer (retailer) requests a specific product or refresh of an existing line
-2. Company proactively refreshes a line and then presents it to buyers
-3. Internal new product development — build first, find buyers later
-
-**Three sales channels:**
-1. Major retail chains (Burlington, TJX family, Ross, Hobby Lobby, Walmart, etc.) — primary
-2. Wholesale sublicensors (Stallion Art, Iconick) — they buy and resell; still go through licensor approval
-3. Internal development — company builds product, presents it to buyers
+**The build has not started.** The project is in pre-design, completing employee interviews before any code is written.
 
 ---
 
-## The POP Creations Pipeline (17 Stages)
+## What Happened in the 2026-05-28/29 Session
 
-This is the confirmed, verbatim pipeline from Jessica (Project Manager). Every licensed SKU goes through some or all of these stages.
+This was the most substantive session since the project started. The following was accomplished:
 
-| # | Stage | Who owns it | Notes |
-|---|-------|-------------|-------|
-| 1 | Art files creation | Creative Designer | Artwork for buyer's selected product format |
-| 2 | Licensing sheet creation | Technical Designer | LS + packaging design using the art file |
-| 3 | Licensing sheet review | Creative Director (Liz) | **Internal gate** — nothing advances without her approval |
-| 4 | Ready to submit | Liz → Licensing Team | Liz sends approved sheet to licensing coordinator |
-| 5 | Concept submitted | Licensing Team | Submitted to licensor portal |
-| 6 | Revisions | Creative + Technical Designer | Licensor rejected — corrections needed |
-| 7 | Concept approved | — | Licensor approved with no corrections needed |
-| 8 | Concept approved with changes | Creative + Technical Designer | Approved but minor revisions required before sampling |
-| 9 | PO received | Technical Designer | Buyer sent purchase order; Techpack files now needed |
-| 10 | Sales requested sample | Technical Designer | No PO yet but buyer wants a physical sample first |
-| 11 | Sample requested | Factory | Techpacks sent to factory; factory makes sample |
-| 12 | Sample received | Liz + Licensing Team | Factory sent PPS photos; internal review before licensor |
-| 13 | Factory resample | Factory | Sample had errors — corrected and re-photographed |
-| 14 | Sample sent to licensor | Licensing Team | PPS submitted to licensor portal |
-| 15 | Sample revision | Creative + Technical Designer | Licensor sent changes to sample |
-| 16 | Pre-production approved | — | PPS approved; mass production authorized |
-| 17 | Production approved | — | All licensor requirements met; submission closed |
+### 1. Interview rounds completed and synthesized
 
-**Key insight from data:** 1,574 products are sitting at "Concept Approved" with no next step. A buyer must actively place a PO (or request a sample without a PO) to advance. Without that, the concept sits dormant indefinitely. The new system needs to distinguish between "waiting for buyer action" vs "actively being worked."
+- **Jessica (PM) — Rounds 1 and 3:** All answers captured and synthesized.
+- **Liz (Creative Director) — Round 2:** All answers captured and synthesized.
+- A full synthesis document was written: `docs/interview-synthesis.md` — 15 sections, 43 answered questions converted into concrete system requirements, design decisions, and build priorities.
 
----
+### 2. All documentation rewritten
 
-## What a ClickUp Record Represents
+The following files were rewritten or created with current, accurate content:
+- `README.md` — system architecture, quick commands, repo structure
+- `AGENTS.md` — operating rules for AI sessions
+- `docs/architecture.md` — infrastructure diagrams
+- `docs/deployment.md` — deployment procedures
+- `docs/configuration.md` — environment and secrets reference
+- `docs/development.md` — local dev workflow
+- `docs/interview-synthesis.md` — NEW: interview findings → system requirements
+- `BUSINESS_INTELLIGENCE.md` — updated with new findings from Rounds 1–3
 
-There are two levels of record in the current system. Plane needs to model both.
+### 3. Infrastructure decision made
 
-**Project card** = one sales offer. One buyer, at one retailer, for one season.  
-Example: "Julie Greer at Burlington for Valentine's 2027."  
-Carries: buyer name, retailer, season, license restrictions, product types offered, on-shelf date, PPS-requested date.
+The project was originally intended to configure self-hosted Plane (the open-source PM tool). That plan changed this session.
 
-**SKU card** = one specific product that a buyer picked from a presentation.  
-Linked to its project card.  
-Carries: the full approval history from art creation through production approval.
+**New plan:** Build a custom PM system from scratch, purpose-built for this company's workflow.
 
-This parent-child relationship is visible directly in the raw D1 `tasks` table and is one of the most important truths in the project:
+**Infrastructure decision:**
+- **Backend:** Fastify API hosted on the existing Coolify server (`178.156.180.212`)
+- **Database:** PostgreSQL (also on Coolify) — replacing Cloudflare D1 as the primary data store
+- **Jobs/automation:** Trigger.dev for background jobs (licensor turnaround tracking, SLA alerts, nightly pipelines)
+- **Frontend:** not yet designed
+- **Cloudflare Worker:** stays live for webhook ingestion and the `/interview` endpoint until a replacement is built
 
-- `Customer Refresh`: `264` parent cards, `2446` child tasks
-- `Customer Category Expansion`: `78` parent cards, `428` child tasks
-- `New Prod Development`: `199` parent cards, `457` child tasks
-- `Licensing Management`: `7281` parent cards, `4280` child tasks
+**Why the change:** Plane (the open-source tool) would require heavy customization to support the two-tier project/SKU model, the design inventory, bulk operations, and role-specific views. Building custom gives full control of the data model from the start and avoids fighting Plane's constraints. The ClickUp data in D1 remains the reference source for migration.
 
-Plane needs to make this relationship explicit rather than flattening everything into one issue type.
+### 4. Build gate established
 
----
+**No custom features will be designed or built until:**
 
-## The Team (Who Uses the System)
+(a) Jen (Spruce Line Creative Director) answers her 30 interview questions.
+(b) A full system design document is written and approved by the project owner.
 
-From the live event log (Mar 30 – May 18, 2026):
+This gate was set because the Spruce Line data model is unknown until Jen answers. Building POP Creations first and retroactively fitting Spruce Line in would likely require a redesign of the core schema.
 
-| Name | Events | Role |
-|------|--------|------|
-| Liz (Elizabeth Parkin) | 469 | Creative Director — approves all designs and licensing sheets; primary internal gate |
-| Umamaheswararao Meka | 443 | Technical Lead Designer — audits tech work, manages factory communication |
-| Jennifer Chaffier (Jen) | 177 | Creative Director, Spruce Line |
-| Ilona Kereki | 43 | Creative Designer / Licensing |
-| Vaibhav | 30 | Designer (offshore) |
-| Marcel Zabolotniy | 15 | Designer |
-| Jessica Cortázar | 8 | Project Manager — manages full pipeline, stage advancement |
-| Érica Perestrelo | 6 | Designer |
+### 5. Oracle report planned
 
-Full team of 18 people spans: POP Creations design, Spruce Line design, technical design, licensing, production (US + China), sales, sourcing.
+After Jen's interview, a comprehensive AI-to-AI knowledge transfer document (the "Oracle report") will be written before any build session begins. It will cover: all interview findings, ClickUp behavioral data, business model, pain points, data model decisions, and system architecture. The purpose is to give any future AI session full context without having to read 10+ source documents.
 
 ---
 
-## Pain Points the New System Must Fix
+## Current State of Each Work Stream
 
-These are verbatim from employee interviews. The Plane design must address them.
+### Employee interviews
 
-### From Jessica (Project Manager)
+| Person | Role | Status |
+|--------|------|--------|
+| Jessica Cortázar | Project Manager | Rounds 1 and 3 complete — all questions answered |
+| Liz Parkin | Creative Director, POP Creations | Round 2 complete — all questions answered |
+| Jen Chaffier | Creative Director, Spruce Line | **PENDING** — 30 questions ready, not yet answered |
 
-**1. Lost preliminary designs** — "Designs are lost several times a week. We manually search past presentations to find reusable designs." Needs a searchable design library filterable by licensor, property, product type, season.
+**Jen's interview URL:** `https://plane-integrations.u2giants.workers.dev/interview?who=jen`
 
-**2. Art Director bottleneck** — Five causes stack up at Liz's review queue:
-- Sheets accumulate while Liz handles other responsibilities
-- Liz changes artwork she already approved at the buyer stage (entire LS must be redone)
-- Unfamiliarity with a product type forces consultation with other roles
-- Colors approved at buyer stage get rejected at LS stage
-- License property errors (e.g., Mickey and Friends art submitted under a Mickey Mouse approval)
+The questions are inserted in D1 `interview_questions` table with `respondent = 'jen'` and `status = 'pending'`. When Jen visits the URL and answers, the Worker stores them in D1 automatically. No session action required to receive them.
 
-**3. Manual stage advancement** — "I'm the only one who moves certain stages. The creative team should be able to mark their work done with the file path, and I should be able to batch-assign the next step." Plane needs role-based stage advancement so designers can move their own work forward.
+### Documentation
 
-**4. No incremental visibility** — "If a team member has 20 SKUs, I can't wait for them to finish all 20. I want to see when the first 5 are ready." Plane must show partial progress, not just final completion.
+Complete and current as of 2026-05-29. No known gaps except the Spruce Line sections (which cannot be written until Jen answers).
 
-**5. Multi-buyer conflicts** — When two buyers pick the same design, a modified version is quietly made without tracking the relationship. Plane needs to detect and flag this.
+### System design
 
-**6. No time visibility** — "Tell me if a SKU has been stuck in one stage too long. Also if it's been at Concept Approved with no PO and no sample request for X days — that work might be wasted." SLA alerts per stage by product type.
+Not started. Blocked on Jen's interview.
 
-**7. Two dates not tracked separately** — On-shelf date (when product must be in stores) and PPS-requested date (when buyer wants to see the sample) are different and both matter. ClickUp only has one date field.
+### Build
 
-**8. Costing sheet constraints not available at design time** — Designers don't know factory constraints (die lines, color count, printing technique) when designing. They find out after the LS is rejected. Constraints need to be visible during the design stage.
-
-### From Liz (Creative Director)
-
-**1. Missing Pantone codes** — Most common submission error. Pre-submission validation should block incomplete sheets.
-
-**2. Designer variance** — Some designers know licensor requirements; others don't. Liz wants to see each designer's revision rate and licensor rejection patterns.
-
-**3. Revision feedback is informal** — Corrections go via Teams messages or Illustrator markups. No structured revision history attached to the submission. Plane should store revision notes on the product card.
+Not started. Blocked on system design approval.
 
 ---
 
-## Key Data From ClickUp
+## Key Decisions Made This Session and Why
 
-This is what the data reveals that the Plane design should reflect:
+### Decision 1: Build custom instead of configuring Plane
 
-**Revision rates by licensor** (avg concept revisions per product):
-- SEGA: 1.00 — every product needs revision
-- Marvel: 0.43
-- Peanuts: 0.38
-- DC Comics: 0.31
-- Disney: 0.26
-- Star Wars: 0.19
+**What:** Replace the plan to configure self-hosted Plane with a plan to build a custom Fastify + PostgreSQL application.
 
-**Licensor turnaround times:**
-- Disney / LucasFilm / Marvel: 1–3 days
-- Nickelodeon / Coca-Cola: 3–6 days
-- NBC Universal / Warner Bros: 5–10 days
-- Peanuts / SEGA / WWE / Care Bears: 7–10 days
-- One Piece (TOEI): 7–15 days
+**Why:** Plane's data model is issue-centric and flat. The business needs a strict two-tier hierarchy (Project Card → SKU Card), a design inventory that is independent of buyer presentations, and bulk operations that Plane does not natively support. Every required feature would need a workaround. Building custom is the same effort with a better result.
 
-**SLA targets by product type (from Jessica)** — full table in `BUSINESS_INTELLIGENCE.md` Section 10. Key example:
-- Simple wall art (stretched/framed/plaque/block): Brief 10 min, Design 30 min, Art File 30 min, Licensing Sheet 75 min
-- Complex products (functional, photo frames, storage): Brief 20–30 min, Design 60 min, LS 100–150 min
-- Revisions add 30–60 min depending on product type
+**Risk:** More engineering work. Mitigated by keeping scope tight — only build what the interviews confirmed is needed.
 
-**Pipeline aging (active products, as of May 2026):**
-- Pre-production products: avg 350 days in pipeline (max 975)
-- Production products: avg 328 days (max 1,720)
-- SKU Created stage: 246 products averaging 1,011 days (2.8 years) — likely abandoned but never closed
+### Decision 2: Fastify + PostgreSQL on Coolify, Trigger.dev for jobs
 
-**File storage:** Design files live on a Synology NAS (`S:\[Licensor]\[Season]\[Project]\`). There is also a DAM system that generates thumbnails stored on DigitalOcean Spaces (S3-compatible). Plane should display thumbnails and NAS paths — no need to re-upload full files.
+**What:** Backend is Fastify. Database is PostgreSQL on the same Coolify server already in use. Background jobs (SLA alerts, nightly ClickUp sync, licensor turnaround tracking) run in Trigger.dev.
+
+**Why:** Coolify server is already provisioned, paid for, and running. Adding PostgreSQL there is zero additional cost. Trigger.dev gives managed job queues without self-hosting a job runner. Fastify is fast to build with and has a clean plugin ecosystem.
+
+**Alternative considered:** Keep using Cloudflare Worker + D1. Rejected because D1 is SQLite with no row-level locking, no full-text search, and limited JOIN performance at scale. The product table alone has 9,000+ rows with complex relationships.
+
+### Decision 3: No build until full system design is approved
+
+**What:** Established a build gate requiring (a) Jen's interview and (b) written system design with owner sign-off before any code is written.
+
+**Why:** The Spruce Line data model is unknown. If POP Creations is built first with a schema that does not fit Spruce Line, the schema will need to be redesigned mid-build. Better to wait two weeks for Jen's answers than rework the schema after two months of code.
 
 ---
 
-## Round 3 Interview Questions (Pending in D1)
+## The Exact Next Action
 
-These questions are inserted into the `interview_questions` table in D1 with `status = 'pending'`. They represent the gaps in understanding that still need to be filled before the Plane design can be finalized. The interview system to deliver them is being built separately (`u2giants/bizanalysis`).
+1. **Wait for Jen to answer her interview.** Her URL is live. No code change is needed. Monitor D1:
+   ```sql
+   SELECT respondent, COUNT(*) as answered
+   FROM interview_questions
+   WHERE respondent = 'jen' AND status = 'answered'
+   GROUP BY respondent;
+   ```
 
-**Current status as of 2026-05-19:**
-
-- Jessica: `21` answered, `11` pending
-- Liz: `15` answered, `0` pending
-- Jen: `0` answered, `12` pending
-
-### For Jessica (Project Manager) — 6 questions
-
-| Topic | Question |
-|-------|----------|
-| PI approval | What is Product Integrity (PI) approval? Only 45 of 9,000 products have it. Is it legacy or product-specific? |
-| Routing tags | 104 tasks are tagged "for adam." What does that mean — routing to sales, or something else? |
-| Dormant products | 1,574 products at "Concept Approved" with no next step. What triggers advancement vs permanent dormancy? |
-| Product lifecycle | Some products have been open 4–5 years. Are they active, or just never closed? How do you decide to cancel? |
-| Costing sheet | Who creates it and when? How does a designer find factory constraints before designing? |
-| Brand Assurance | What is the Brand Assurance checkpoint? Who does it and when? |
-
-**Additional questions added on 2026-05-19:**
-
-| Topic | Question |
-|-------|----------|
-| SKU creation trigger | What exact business event creates a child SKU under a project card? |
-| Reuse / derivatives | If a design is reused or adapted for another buyer, should it be the same SKU, a linked derivative, or a separate SKU? |
-
-### For Liz (Creative Director) — 6 questions
-
-| Topic | Question |
-|-------|----------|
-| Role evolution | Sarbani had a formal "sarbani_approval" checkpoint. Do you perform the same step? How has the CD role changed? |
-| File access | Do you need full-size design files, or is a thumbnail + NAS path enough for approvals? |
-| Brand Assurance | What is Brand Assurance — do you perform it? |
-| Designer visibility | Would revision rates / licensor rejection patterns per designer be useful to see? |
-| Revision workflow | Would in-system revision notes attached to the submission change how you work vs Teams markups? |
-| Wholesale channel | Do Stallion Art / Iconick products (sublicensors) go through any different review process? |
-
-### For Jen (Spruce Line CD) — 10 questions (new — never interviewed before)
-
-| Topic | Question |
-|-------|----------|
-| Full process | Walk me through the Spruce Line from idea to production — start from the beginning |
-| Daily routine | What do you open first in ClickUp? What are you trying to find out? |
-| Task structure | Do you track individual products, collections, or presentations? What does one ClickUp task represent? |
-| Decision flow | How does a product get from "design done" to "buyer approved" to "in production"? Who moves it forward? |
-| Approvals | No licensor involved — what are the approval steps? Who signs off before buyer? Before production? |
-| Pain point | What's the single most frustrating thing about managing products today? |
-| Brand identity | What is "Edge Generic"? Is "Edge" the brand name for the Spruce Line? |
-| Buyer selections | When a buyer makes selections — does that get tracked in ClickUp or somewhere else? |
-| Wishlist | If you could have any tool you don't have today, what would it be? |
-| File workflow | When you finish designing something, what do you do with the file? |
-
-**Additional questions added on 2026-05-19:**
-
-| Topic | Question |
-|-------|----------|
-| Reuse model | When a Spruce design or collection is reused for multiple buyers, should that reuse be a duplicate, derivative, or same record? |
-| Selection split | If a buyer likes only part of a collection, what should become the execution unit in the new system: project, collection, or SKU? |
-
-**Design implication:** The Spruce Line workflow in Plane cannot be finalized until Jen's interview is complete. The data suggests her ClickUp tasks track collections/presentations (names like "Gaming - updated 10.27.25", "BCF - Kim/Anna - New Formats") rather than individual SKUs. Whether Plane should model Spruce Line as collections-of-designs vs individual products is unknown until Jen answers.
+2. **When answers arrive, start a new session with:**
+   - `docs/interview-synthesis.md` — add a Section 16 for Spruce Line findings from Jen
+   - Write the Oracle report (comprehensive knowledge transfer document, no specific filename yet — name it `docs/oracle-report.md`)
+   - Write the full system design (`docs/system-design.md`) covering: data model, API surface, Fastify route structure, PostgreSQL schema, Trigger.dev job list, frontend views per role
+   - Get owner sign-off on the system design
+   - Begin build
 
 ---
 
-## Requirements for the New System
+## What Is Fully Done
 
-### Must-Have
+- All employee interviews for Jessica and Liz — captured and synthesized
+- Full synthesis document with prioritized build list (`docs/interview-synthesis.md`)
+- All infrastructure documentation
+- Decision on infrastructure stack (Fastify + PostgreSQL + Trigger.dev)
+- Build gate logic — no premature work on the system
 
-- **Project-SKU hierarchy** — Every SKU belongs to a project (buyer + retailer + season). Project carries context; SKU carries approval history.
-- **Two date fields per SKU** — On-shelf date and PPS-requested date are separate and both required.
-- **Full 17-stage pipeline** — All stages as explicit states in Plane. Each stage knows its expected duration by product type.
-- **Stage-overdue alerts** — Surface to PM when a SKU exceeds SLA for its current stage. Alert separately when a SKU has been at "Concept Approved" with no PO and no sample request beyond a threshold.
-- **Design library** — Searchable repository of all preliminary designs including passed-on/rejected ones. Filterable by licensor, property, product type, season, retailer. Designs are independent of buyer selections.
-- **Pre-submission validation** — Block submission to Liz's queue if Pantone codes or required manufacturing specs are missing.
-- **Costing sheet constraints at design time** — Factory constraints (die lines, color count, printing technique) visible to designers while they work, not after the LS is rejected.
-- **Batch stage advancement** — PM can move multiple SKUs to next stage in one action.
-- **Incremental visibility** — Designers mark individual SKUs ready; PM sees partial progress in real time.
-- **Creative Director review queue** — All sheets pending Liz's review, sorted by age. Status: pending / revision sent / approved.
-- **Change-of-hands history** — When a different designer takes over a SKU, the system records who did what and when.
-- **DAM thumbnail integration** — Thumbnails from the existing DAM (DigitalOcean Spaces S3) displayed on product cards. Full-size files stay on the NAS; Plane shows the thumbnail and the NAS path. No re-uploading.
+## What Is In Progress
 
-### Should-Have
+- Jen's interview — questions are live at the Worker URL, waiting for her to answer
 
-- **PM dashboard** — Bottleneck view, designer workload, retroactive deadline calculator.
-- **Multi-buyer conflict detection** — Alert when two active projects select the same design.
-- **Structured revision notes** — In-system revision comments attached to specific submissions, replacing Teams messages.
-- **Role-specific views** — Designer, Creative Director, PM, Sales each see a tailored workspace.
-- **Notifications** — When Liz approves → notify designer + licensing coordinator. When licensor responds → notify PM.
-- **Wholesale sublicensor support** — Stallion Art / Iconick products use the same pipeline but need routing tags and separate views.
+## What Has Not Started
 
-### Nice-to-Have
-
-- **Designer productivity metrics** — Pick rate, revision rate, avg stage completion time, licensor familiarity score per designer.
-- **Natural language queries** — Jessica's specific queries (see `BUSINESS_INTELLIGENCE.md` Section 13 for verbatim examples).
+- Spruce Line section of interview synthesis
+- Oracle knowledge transfer report
+- System design document
+- PostgreSQL schema design
+- Fastify API design
+- Any actual build work
 
 ---
 
-## How to Access All the Data
+## Known Risks and Blockers
 
-### D1 Database (ClickUp data)
+### Hard blocker: Jen's interview
 
-**Database ID:** `c37aeb36-e16e-416b-b699-c910f6f8dc10`  
-**MCP tool:** `mcp__9a4e64b3-8b0d-4708-9ca2-19515b76966e__d1_database_query`
+The Spruce Line data model is entirely unknown. The `products` table has 701 Spruce Line items, but the data shows task names like "Gaming - updated 10.27.25" and "BCF - Kim/Anna - New Formats" — these appear to be collection/presentation names, not individual SKU names. Until Jen answers:
 
-```json
-{ "database_id": "c37aeb36-e16e-416b-b699-c910f6f8dc10", "sql": "SELECT ..." }
-```
+- It is unknown whether Spruce Line should be modeled as collections of designs or as individual SKUs
+- It is unknown what the approval stages are
+- It is unknown whether a Spruce Line "task" in ClickUp maps to a project card, a collection, or a product
 
-Uses SQLite syntax. Always add `WHERE is_internal = 0` to exclude the internal dev space.
+**Do not design any schema that assumes Spruce Line is SKU-like until Jen confirms.**
 
-**Key tables:**
-- `products` (9,069 rows) — primary query surface, but not perfect one-row-per-business-product truth
-- `workflow_stages` (76 rows) — maps raw ClickUp status strings to clean stage names
-- `checkpoint_map` (27 rows) — formal milestone definitions
-- `events` (1,255 rows) — live webhook events with real user names
-- `interview_questions` (59 rows) — all answered and pending interview content
+### Risk: schema design mismatch between POP Creations and Spruce Line
 
-Full table reference: `DATA_ACCESS_GUIDE.md` in this repo.
+If the two product lines need fundamentally different data models, the system needs to either: (a) use a shared schema with null-able fields for the line that doesn't use them, or (b) use separate tables with a shared parent. This decision requires Jen's answers.
 
-### Key documents in this repo
+### Risk: costing sheet integration scope creep
 
-| File | What it contains |
-|------|-----------------|
-| `BUSINESS_INTELLIGENCE.md` | **Read this first.** Full synthesis of everything known about the company — pipeline, team, pain points, SLA targets, licensor data, requirements. |
-| `DATA_ACCESS_GUIDE.md` | How to query the D1 database; every table with column descriptions and sample queries |
-| `SCHEMA_DESIGN.md` | The proposed robust D1 schema (what a well-designed schema looks like) |
-| `DB_ANALYSIS.md` | Original analysis of the raw ClickUp database |
-| `DATA_GAPS_AND_FIXES.md` | Known data quality issues and webhook bugs fixed |
-| `AI_OPERATING_RULES.md` | Rules for working in this repo (single branch = main, Coolify for runtime config, etc.) |
+Costing sheets are currently outside ClickUp entirely. Liz, Jessica, and the technical designers all want costing sheet constraints visible at design time. This could be a simple text/attachment field, or a full costing workflow with its own table. The system design needs to scope this explicitly before build.
 
-### Live Worker (for querying data via HTTP)
+### Risk: DAM thumbnail integration
 
-`https://plane-integrations.u2giants.workers.dev/query` — POST with `{ "question": "..." }` for natural language → SQL → answer.
-
-### Production Plane instance
-
-Deployed on Coolify at `178.156.180.212`. Coolify REST API:
-```
-Base URL: http://178.156.180.212:8000/api/v1
-Auth: Bearer 1|mlVx9mbwsN1Sga6eLtJEvmPioy6Sra9AnepnCe3K7d0a2927
-Server UUID: onwp0kd7w1w74w9yeotnoihp
-```
+Thumbnails exist on DigitalOcean Spaces (S3-compatible). The current Cloudflare Worker has the integration already. When migrating to Fastify + PostgreSQL, this integration needs to be re-implemented. The DigitalOcean Spaces credentials must be confirmed before the migration is complete.
 
 ---
 
-## What This New Session Should Do
+## Context That Would Otherwise Be Lost
 
-### Primary objective
-Design how Plane should be structured to serve this company's real workflows. This means making concrete decisions about:
+### The 1,574 "Concept Approved" products
 
-1. **Workspace structure** — How many projects? How are POP Creations and Spruce Line separated? Are projects per-licensor, per-retailer, per-product-line, or something else?
+There are 1,574 products at "Concept Approved" with no PO and no sample request. These are NOT abandoned — they are approved concepts that no buyer has purchased yet. They should be surfaced as the "design inventory" and actively offered to buyers each season. The new system must make these findable and offerable, not just show them as a stuck-stage count.
 
-2. **States (pipeline stages)** — Plane uses "states" instead of ClickUp statuses. Map the 17 POP Creations stages to Plane states. Define the Spruce Line states (pending Jen's interview, but design what's known).
+### The "Sarbani approval" checkpoint
 
-3. **Issue types / hierarchy** — Plane has "issues" with optional sub-issues. How do "project cards" (buyer + retailer + season) and "SKU cards" map to Plane's data model? Is a project card a Plane Project, or a parent Issue?
+Sarbani was a previous Creative Director. A checkpoint named `sarbani_approval` exists in the D1 `checkpoint_map`. Liz (Round 2) confirmed she performs the same review function. The new system should rename this to `creative_director_review`. Do not remove the checkpoint — it is a real gate.
 
-4. **Custom fields** — What custom fields does each issue type need? (On-shelf date, PPS-requested date, licensor, retailer, product type, put-up/manufacturing method, factory, costing constraints, etc.)
+### Products open 4–5 years
 
-5. **Cycles and modules** — Plane supports cycles (sprints) and modules (groupings). Are licensor submissions a "module"? Are seasonal deadlines a "cycle"?
+The `products` table contains items that have been open for 4–5 years at early stages. These are almost certainly abandoned but never formally closed. The migration plan needs a one-time closure pass with a bulk "Abandoned" state. The system itself needs a Cancel action with a required reason field — no SKU should ever go silent again.
 
-6. **Views** — Define the key views for each role: PM dashboard, CD review queue, designer workload, licensing tracker.
+### Interview data is in D1
 
-7. **Automation** — What stage transitions should trigger notifications? What validations should block advancement?
+All interview questions and answers are in D1 `interview_questions` table. The Cloudflare Worker at `https://plane-integrations.u2giants.workers.dev/interview?who=jen` is the live interview delivery UI. The Worker source is at `integrations/worker/src/index.js`. Do not shut down this Worker — it is the only way Jen can answer.
 
-### Critical modeling warning
+### The "for adam" tag
 
-Do not start by asking "how do we map ClickUp lists to Plane projects?"
+104 ClickUp tasks are tagged "for adam." This likely means routing to a sales person named Adam. It was listed as an open question but was not answered in Rounds 1–3. It is a low-priority open item.
 
-Start by asking:
+### Wholesale channel (Stallion Art, Iconick)
 
-- what is a project brief?
-- what is a preliminary design?
-- what is a reusable concept?
-- what is a picked SKU?
-- what is a derivative SKU for another buyer?
+These are sublicensors who buy the product and resell it, but their designs still go through the full POP Creations licensor approval pipeline. They are tagged `stallion art wholesale only` (62 tasks) and `iconick only` (5 tasks) in ClickUp. The new system should preserve these routing tags.
 
-The replacement system will only be materially better than ClickUp if those domain objects are made explicit.
+### File storage model
 
-### What to decide before writing any code
+Design files live on a Synology NAS at path format `S:\[Licensor]\[Season]\[Project]\`. A DAM system generates thumbnails stored on DigitalOcean Spaces. The new system should display thumbnails and NAS paths — no need to re-upload full files. Liz confirmed a thumbnail + NAS path is sufficient for approvals.
 
-- Whether the 17-stage pipeline maps to a single Plane project with 17 states, or multiple projects with fewer states each
-- Whether the Project Card / SKU Card hierarchy is Plane Projects > Issues, or Epic > Stories, or something else
-- How Spruce Line is modeled (blocked on Jen's interview — but define the options)
-- What the design library looks like in Plane's data model
+### The interview system stays in this repo
 
-### What NOT to do in this session
-
-- Do not design or implement the AI interview system (that's `u2giants/bizanalysis`)
-- Do not modify the Cloudflare Worker or D1 schema for interview purposes
-- Do not make decisions about Round 3 interview delivery — those answers are pending
+Previously discussed moving the interview system to `u2giants/bizanalysis`. That move did not happen. The interview endpoint is part of the Cloudflare Worker at `integrations/worker/src/index.js`, which is in this repo. Keep it here.
 
 ---
 
-## Key Design Decisions Still Open
+## Key Files
 
-1. **Spruce Line model** — Collections vs individual SKUs. Cannot finalize until Jen is interviewed. Design both options so one can be selected.
+| File | Purpose |
+|------|---------|
+| `docs/interview-synthesis.md` | Full translation of 43 interview answers into system requirements — primary design reference |
+| `BUSINESS_INTELLIGENCE.md` | Company overview, pipeline, pain points, data analysis, SLA targets |
+| `AGENTS.md` | Operating rules for AI sessions working in this repo |
+| `README.md` | System architecture, quick commands, infra reference |
+| `docs/architecture.md` | Infrastructure diagrams |
+| `integrations/worker/src/index.js` | Cloudflare Worker — webhook receiver, /query, /interview |
+| `scripts/build_products_table.py` | Rebuilds `products` + `product_checkpoints` from D1 |
+| `scripts/migrate_robust_schema.sql` | Full D1 schema (idempotent) |
 
-2. **"Concept Approved" limbo state** — 1,574 products are approved but waiting indefinitely for a buyer PO. Does Plane need a special "parked" state, or a time-based alert when a product sits here too long?
+## Key Infrastructure
 
-3. **Sarbani approval checkpoint** — There is still a formal `sarbani_approval` checkpoint in the D1 system from the previous Creative Director. Whether Liz has absorbed this role or it's been eliminated is unanswered. Confirmed in Round 3 Liz question.
-
-4. **Brand Assurance** — Referenced in both the D1 checkpoint map and the Round 3 questions. No one has explained what it is yet. Cannot model it until Jen or Liz answers.
-
-5. **PI (Product Integrity) approval** — Only 45 of 9,069 products have it. Likely product-type-specific. Cannot model it until Jessica answers.
-
-6. **Costing sheet workflow** — Who creates it, when, and how it connects to the product card. Cannot design the data model for factory constraints at design time until Jessica answers.
-
-7. **File access in Plane** — Does Liz need full-size files accessible in Plane, or are thumbnails + NAS path sufficient? Determines whether Plane needs DAM integration or just a text field for the path.
+| Component | Detail |
+|-----------|--------|
+| Cloudflare Worker | `plane-integrations.u2giants.workers.dev` — live, do not modify without deploying |
+| Cloudflare D1 | `clickup-events` — ID `c37aeb36-e16e-416b-b699-c910f6f8dc10` |
+| Coolify server | `178.156.180.212:8000` — reserved for the new Fastify API + PostgreSQL |
+| Coolify API auth | `Bearer 1|mlVx9mbwsN1Sga6eLtJEvmPioy6Sra9AnepnCe3K7d0a2927` |
+| ClickUp workspace | Team ID `2298436` |
+| GitHub | `u2giants/plane` — Claude Code sessions run in `/worksp/plane` |
