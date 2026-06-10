@@ -84,7 +84,7 @@ PM domain model: 14 Directus collections (POP 2-tier `project→product`, Spruce
 | Cloudflare zone `designflow.app` | `921eb133a3f7d5802780445b283f84ce` | `pm` A-record → `178.156.180.212`, DNS-only |
 | Entra app "POP PIM — Directus SSO" | appId `55bf6302-0d58-4246-b0e2-970b8371fd70` | tenant `1caeb1c0-a087-4cb9-b046-a5e22404f971`; redirect `https://pm.designflow.app/auth/login/microsoft/callback` |
 | Entra app "POP PIM — Graph Role Sync" | appId `a645fc70-fea9-4703-871c-900b97f898d7` | role-sync write creds (`GroupMember.ReadWrite.All`); secret in `/home/ai/.poppim-deploy.env` only |
-| Entra role groups (`POP PIM ·`) | Administrator `085a0511-5afa-4b01-b38e-ae06e61ea879`, Sales `a4d4447a-2e8c-4594-9738-decadd5dc6c1`, Licensing `df5f7693-1dbc-4b12-9dae-b18570d593bb`, Designer `9d977745-d86c-4950-866d-211e0dd3fac7`, Viewer `6ab28eb2-3c4b-4c81-b746-2ad63def306d`, Factory `995e1908-912d-4ada-bd76-5485183011f9` | mirror of Directus roles; owned by the sync (§11) |
+| Entra role groups (`POP PIM ·`) | Administrator `085a0511-5afa-4b01-b38e-ae06e61ea879`, Sales `a4d4447a-2e8c-4594-9738-decadd5dc6c1`, Licensing `df5f7693-1dbc-4b12-9dae-b18570d593bb`, Designer `9d977745-d86c-4950-866d-211e0dd3fac7`, Viewer `6ab28eb2-3c4b-4c81-b746-2ad63def306d`, Vendor `995e1908-912d-4ada-bd76-5485183011f9` | mirror of Directus roles; owned by the sync (§11) |
 | Directus SSO admin | `albert@popcre.com` (provider microsoft) | Albert signs in via Microsoft; see §11 |
 | Directus script admin | `svc@popcre.com` (provider default) | password in Coolify `DX_ADMIN_PASSWORD`; used by scripts |
 | Legacy worker | `plane-integrations` | `plane-integrations.u2giants.workers.dev`; D1 `c37aeb36-e16e-416b-b699-c910f6f8dc10` — **do not rename** |
@@ -136,11 +136,11 @@ Creating a Directus collection via API without `schema: {}` makes a *folder* (no
 ### Entra is the role hub; Directus is the single writer (Model B)
 **Looks like:** roles are managed in Directus, yet six `POP PIM ·` security groups exist in Entra.
 **Actually:** roles live in **Directus** (the editing surface) and are mirrored **outbound to Entra** so other apps (CRM/DAM) read one source. A reconcile script (`pm-system/sync/entra-role-sync.mjs`) maps each Directus role → its Entra group, **hourly**, via the host systemd timer `poppim-entra-sync.timer`. Direction is **one-way Directus→Entra**; only `provider=microsoft`, active users with a mapped role are managed; the six groups are **owned by the sync** (a member without a matching Directus role is removed).
-- **Role→group map** (also in the script): Administrator/Sales/Licensing/Designer/Viewer/Factory → the six `POP PIM ·` groups (ids in §8).
+- **Role→group map** (also in the script): Administrator/Sales/Licensing/Designer/Viewer/Vendor → the six `POP PIM ·` groups (ids in §8).
 - **Write credential:** a dedicated Entra app **`POP PIM — Graph Role Sync`** (separate from the SSO app) with application perms `GroupMember.ReadWrite.All` + `User.Read.All`, admin-consented. Client id/secret + tenant are `GRAPH_*` in `/home/ai/.poppim-deploy.env` only — **never** in the repo or the Directus container.
 - **Safety:** the script is **dry-run by default**; it writes only with `SYNC_APPLY=1` (the systemd unit sets it). Run a dry run anytime: `POPPIM_ENV_FILE=/home/ai/.poppim-deploy.env DX_URL=https://pm.designflow.app node pm-system/sync/entra-role-sync.mjs`.
 **Do not change because:** widening the Graph app's permissions or moving its secret onto the public Directus container increases blast radius; keep it least-privilege and host-only.
-**Follow-ups:** Factory role is currently read-only/no-pricing — per-factory **row scoping** (a factory user sees only their factory's products) needs a user→factory mapping and a permission filter. CRM/DAM become **read-only consumers** of these groups; promote one to a second writer only deliberately (avoids sync loops).
+**Follow-ups:** the **Vendor** role currently has **no product/order access** (deliberate, until scoping exists) — per-vendor **row scoping** (a vendor sees only their own products) needs a user→factory/vendor mapping and a permission filter. CRM/DAM become **read-only consumers** of these groups; promote one to a second writer only deliberately (avoids sync loops).
 
 ### Content-collection order is set via `meta.sort`
 Login lands on the first non-hidden collection in the content nav. Collections sort by `meta.sort` (set on each via `PATCH /collections/:name`); `project` and `product` are pinned first, lookup tables (retailer/buyer/licensor/…) last. Without `sort`, Directus falls back to alphabetical (which dumped users on `buyer`/`licensor`).
@@ -191,7 +191,7 @@ Deployed Directus + Postgres on Coolify at `pm.designflow.app`. Two non-obvious 
 | open | Postgres backups | Add scheduled `pg_dump` of `poppim-db` + document retention |
 | open | Phase-1.x data model | M2M relations (multi-buyer seam), remaining Flows (dormant/SLA), per-role saved Views |
 | superseded | Designflow PLM integration | Dropped in favor of Entra-as-role-hub (Model B); roles now centralize in Entra, not another app |
-| open | Factory role row-scoping | Factory role is read-only/no-pricing; add per-factory filter (user→factory map) so a factory user sees only their products |
+| open | Vendor role row-scoping | Vendor role has no product access yet; add per-vendor filter (user→factory/vendor map) so a vendor sees only their own products |
 | open | CRM/DAM read Entra groups | Wire the CRM and DAM to read the six `POP PIM ·` groups for roles (read-only consumers; one writer = Directus) |
 | open | Verify new-user notify Flow end-to-end | "New user role reminder" Flow is active but only fires on a real `provider=microsoft` sign-in; confirm on next real SSO signup |
 | open | ClickUp → Directus migration import | Script under `pm-system/migration/` reading D1 → Directus API with `external_id` |
@@ -204,4 +204,4 @@ Deployed Directus + Postgres on Coolify at `pm.designflow.app`. Two non-obvious 
 | done | ClickUp import | 651 projects + 16,534 products imported via ClickUp API (`pm-system/migration/clickup-import.mjs`) |
 | done | Role taxonomy + new-user notify Flow | Designer/Sales/Licensing/Viewer/Administrator; `pm-system/setup-roles-and-flows.mjs`; 2026-06-10 |
 | done | Kanban boards | `advanced-kanban-layout` Marketplace extension on a persistent volume; Project (by status) + Product (by stage) global default boards; 2026-06-10 |
-| done | Entra role hub (Model B) | 6 `POP PIM ·` groups + `Graph Role Sync` app; hourly `poppim-entra-sync.timer` mirrors Directus roles → Entra; Factory role added; 2026-06-10 |
+| done | Entra role hub (Model B) | 6 `POP PIM ·` groups + `Graph Role Sync` app; hourly `poppim-entra-sync.timer` mirrors Directus roles → Entra; Vendor role added; 2026-06-10 |

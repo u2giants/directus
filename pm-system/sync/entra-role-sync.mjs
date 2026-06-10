@@ -47,7 +47,7 @@ const ROLE_TO_GROUP = {
   Licensing: 'df5f7693-1dbc-4b12-9dae-b18570d593bb',
   Designer: '9d977745-d86c-4950-866d-211e0dd3fac7',
   Viewer: '6ab28eb2-3c4b-4c81-b746-2ad63def306d',
-  Factory: '995e1908-912d-4ada-bd76-5485183011f9',
+  Vendor: '995e1908-912d-4ada-bd76-5485183011f9',
 };
 
 for (const [k, v] of Object.entries({ DX_EMAIL, DX_PASSWORD, TENANT, CLIENT_ID, CLIENT_SECRET })) {

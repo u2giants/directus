@@ -32,15 +32,17 @@ const REF = ['retailer', 'buyer', 'licensor', 'property', 'factory', 'product_ty
 // product fields visible to non-pricing roles (omits cost_target / quoted_cost / value).
 const PRODUCT_NO_PRICING = ['id', 'code', 'name', 'business_unit', 'project', 'design', 'product_type', 'licensor', 'property', 'factory', 'stage', 'retailer', 'buyer', 'put_up', 'on_shelf_date', 'pps_requested_date', 'brand_assurance_number', 'pi_status', 'closure_reason', 'external_id', 'external_source'];
 
-async function makeRole(name, desc, { pricing, write }) {
+async function makeRole(name, desc, { pricing, write, products = true }) {
   const ex = await api('GET', `/roles?filter[name][_eq]=${encodeURIComponent(name)}&fields=id&limit=1`);
   if (ex.length) { console.log(`role ${name} already exists — skipping`); return ex[0].id; }
   const role = await api('POST', '/roles', { name, icon: 'badge', description: desc });
   const policy = await api('POST', '/policies', { name: name + ' Policy', icon: 'badge', description: desc, admin_access: false, app_access: true });
   const perms = [];
   for (const c of REF) perms.push({ policy: policy.id, collection: c, action: 'read', fields: ['*'], permissions: {}, validation: {} });
-  perms.push({ policy: policy.id, collection: 'product', action: 'read', fields: pricing ? ['*'] : PRODUCT_NO_PRICING, permissions: {}, validation: {} });
-  perms.push({ policy: policy.id, collection: 'order', action: 'read', fields: pricing ? ['*'] : ['id', 'product', 'retailer', 'buyer', 'order_number', 'order_date', 'quantity'], permissions: {}, validation: {} });
+  if (products) {  // Vendor gets no product/order visibility until per-vendor row scoping exists
+    perms.push({ policy: policy.id, collection: 'product', action: 'read', fields: pricing ? ['*'] : PRODUCT_NO_PRICING, permissions: {}, validation: {} });
+    perms.push({ policy: policy.id, collection: 'order', action: 'read', fields: pricing ? ['*'] : ['id', 'product', 'retailer', 'buyer', 'order_number', 'order_date', 'quantity'], permissions: {}, validation: {} });
+  }
   if (write) for (const c of write) perms.push(
     { policy: policy.id, collection: c, action: 'create', fields: ['*'], permissions: {}, validation: {} },
     { policy: policy.id, collection: c, action: 'update', fields: ['*'], permissions: {}, validation: {} },
@@ -67,7 +69,7 @@ TOKEN = (await api('POST', '/auth/login', { email: ADMIN_EMAIL, password: ADMIN_
 await makeRole('Sales', 'Sees pricing; manages offers & products', { pricing: true, write: ['project', 'product', 'design'] });
 await makeRole('Licensing', 'Manages licensor submissions (Brand Assurance, PI)', { pricing: true, write: ['product'] });
 await makeRole('Viewer', 'Read-only, no pricing', { pricing: false, write: null });
-await makeRole('Factory', 'External manufacturer: read-only, no pricing (per-factory row scoping TBD)', { pricing: false, write: null });
+await makeRole('Vendor', 'External vendor/manufacturer: no product access yet (per-vendor row scoping TBD)', { pricing: false, write: null, products: false });
 await setupNotifyFlow();
 const roles = await api('GET', '/roles?fields=name&limit=20');
 console.log('ROLES:', roles.map(r => r.name).join(', '));
