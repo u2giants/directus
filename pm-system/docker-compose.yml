@@ -28,7 +28,7 @@ services:
       AUTH_MICROSOFT_CLIENT_ID: ${MS_CLIENT_ID}
       AUTH_MICROSOFT_CLIENT_SECRET: ${MS_CLIENT_SECRET}
       AUTH_MICROSOFT_ISSUER_URL: https://login.microsoftonline.com/${MS_TENANT_ID}/v2.0/.well-known/openid-configuration
-      AUTH_MICROSOFT_IDENTIFIER_KEY: email
+      AUTH_MICROSOFT_IDENTIFIER_KEY: preferred_username
       AUTH_MICROSOFT_ALLOW_PUBLIC_REGISTRATION: "false"   # only pre-created users can sign in via SSO
       WEBSOCKETS_ENABLED: "true"
       TELEMETRY: "false"
