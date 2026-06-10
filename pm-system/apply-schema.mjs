@@ -140,8 +140,13 @@ async function main() {
   ];
   for (const p of perms) await api('POST', '/permissions', p);
   await api('POST', '/access', { role: role.id, policy: policy.id });
-  const designer = await api('POST', '/users', { email: 'designer@popcre.com', password: 'Designer123!', first_name: 'Demo', last_name: 'Designer', role: role.id });
-  console.log('✓ Designer role/policy (pricing hidden) + designer user');
+  // PROD SAFETY: do NOT create a known-password test user by default. seed-and-verify sets this flag.
+  if (process.env.CREATE_TEST_DESIGNER === '1') {
+    await api('POST', '/users', { email: 'designer@popcre.com', password: 'Designer123!', first_name: 'Demo', last_name: 'Designer', role: role.id });
+    console.log('✓ Designer role/policy (pricing hidden) + TEST designer user');
+  } else {
+    console.log('✓ Designer role/policy (pricing hidden) — no test user (set CREATE_TEST_DESIGNER=1 to add one)');
+  }
 
   // 5. Flow: on product.stage change -> create stage_history row
   const flow = await api('POST', '/flows', { name: 'Stage history ledger', icon: 'history', status: 'active', trigger: 'event', accountability: 'all', options: { type: 'action', scope: ['items.update'], collections: ['product'] } });

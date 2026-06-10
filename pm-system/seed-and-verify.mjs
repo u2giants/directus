@@ -50,6 +50,9 @@ async function main() {
   assert(graph.product_type.sla_licensing_sheet === 75, 'product → product_type SLA target = 75 min');
 
   console.log('\n— VERIFY 2: field-level permission (Designer cannot see pricing) —');
+  // ensure the test designer user exists (apply-schema no longer creates it by default — prod safety)
+  const drole = (await api('GET', '/roles?filter[name][_eq]=Designer&fields=id'))[0];
+  if (drole) { try { await api('POST', '/users', { email: 'designer@popcre.com', password: 'Designer123!', first_name: 'Demo', last_name: 'Designer', role: drole.id }); } catch {} }
   const dToken = (await api('POST', '/auth/login', { email: 'designer@popcre.com', password: 'Designer123!' }, '')).access_token;
   const asDesigner = await api('GET', `/items/product/${product}?fields=*`, null, dToken);
   console.log('   designer sees fields:', Object.keys(asDesigner).join(', '));

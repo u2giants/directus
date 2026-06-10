@@ -1,61 +1,46 @@
-# Directus PM system — production deploy (Postgres). Suitable for Coolify.
-# 1) copy .env.example -> .env and fill in (esp. KEY, SECRET, ADMIN_*, R2, SSO).
-# 2) deploy. 3) run apply-schema.mjs against it. 4) restart the directus service.
+# Directus PM system — AUTHORITATIVE copy of the deployed Coolify service.
+# Deployed as Coolify service "poppim" (uuid nzli85mk3luzb6u7cnq5fidu) on server onwp0kd7w1w74w9yeotnoihp.
+# Live at https://pm.designflow.app. All ${...} values are set as RUNTIME env in Coolify (never in this repo).
+# Coolify magic vars: SERVICE_FQDN_POPPIMAPP_8055 binds the public domain to container port 8055.
+# Custom domain is also stored in Coolify DB service_applications.fqdn (see AGENTS.md §11).
+# To change the schema: run pm-system/apply-schema.mjs against the instance, then restart the service.
 services:
-  database:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    volumes:
-      - pm-pgdata:/var/lib/postgresql/data
+  poppim-app:
+    image: directus/directus:11
+    expose:
+      - "8055"
     environment:
-      POSTGRES_USER: ${DB_USER:-directus}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
-      POSTGRES_DB: ${DB_DATABASE:-directus}
-    healthcheck:
-      test: ["CMD", "pg_isready", "-U", "${DB_USER:-directus}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  directus:
-    image: directus/directus:latest
-    restart: unless-stopped
-    ports:
-      - "8055:8055"
-    depends_on:
-      database:
-        condition: service_healthy
-    environment:
-      KEY: ${KEY:?set KEY}
-      SECRET: ${SECRET:?set SECRET}
-      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:8055}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD}
+      SERVICE_FQDN_POPPIMAPP_8055: pm.designflow.app
+      KEY: ${DX_KEY}
+      SECRET: ${DX_SECRET}
+      PUBLIC_URL: https://pm.designflow.app
+      ADMIN_EMAIL: ${DX_ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${DX_ADMIN_PASSWORD}
       DB_CLIENT: pg
-      DB_HOST: database
-      DB_PORT: 5432
-      DB_DATABASE: ${DB_DATABASE:-directus}
-      DB_USER: ${DB_USER:-directus}
-      DB_PASSWORD: ${DB_PASSWORD}
-      # --- Open Innovation Grant license key (uncomment once you have it) ---
-      # LICENSE_KEY: ${LICENSE_KEY}
-      # --- File storage on Cloudflare R2 (S3-compatible) ---
-      STORAGE_LOCATIONS: ${STORAGE_LOCATIONS:-r2}
-      STORAGE_R2_DRIVER: ${STORAGE_R2_DRIVER:-s3}
-      STORAGE_R2_KEY: ${STORAGE_R2_KEY}
-      STORAGE_R2_SECRET: ${STORAGE_R2_SECRET}
-      STORAGE_R2_BUCKET: ${STORAGE_R2_BUCKET}
-      STORAGE_R2_ENDPOINT: ${STORAGE_R2_ENDPOINT}
-      STORAGE_R2_REGION: ${STORAGE_R2_REGION:-auto}
-      # --- Microsoft Entra SSO (OIDC) — works on Core+OIG. See README. ---
-      # AUTH_PROVIDERS: microsoft
-      # AUTH_MICROSOFT_DRIVER: openid
-      # AUTH_MICROSOFT_CLIENT_ID: ${MS_CLIENT_ID}
-      # AUTH_MICROSOFT_CLIENT_SECRET: ${MS_CLIENT_SECRET}
-      # AUTH_MICROSOFT_ISSUER_URL: https://login.microsoftonline.com/${MS_TENANT_ID}/v2.0/.well-known/openid-configuration
-      # AUTH_MICROSOFT_IDENTIFIER_KEY: email
-      # AUTH_MICROSOFT_ALLOW_PUBLIC_REGISTRATION: "false"
+      DB_HOST: poppim-db
+      DB_PORT: "5432"
+      DB_DATABASE: directus
+      DB_USER: directus
+      DB_PASSWORD: ${DX_DB_PASSWORD}
+      LICENSE_KEY: ${DX_LICENSE_KEY}          # Directus Open Innovation Grant license
+      AUTH_PROVIDERS: microsoft
+      AUTH_MICROSOFT_DRIVER: openid
+      AUTH_MICROSOFT_CLIENT_ID: ${MS_CLIENT_ID}
+      AUTH_MICROSOFT_CLIENT_SECRET: ${MS_CLIENT_SECRET}
+      AUTH_MICROSOFT_ISSUER_URL: https://login.microsoftonline.com/${MS_TENANT_ID}/v2.0/.well-known/openid-configuration
+      AUTH_MICROSOFT_IDENTIFIER_KEY: email
+      AUTH_MICROSOFT_ALLOW_PUBLIC_REGISTRATION: "false"   # only pre-created users can sign in via SSO
+      WEBSOCKETS_ENABLED: "true"
       TELEMETRY: "false"
-
+    depends_on:
+      - poppim-db
+  poppim-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: directus
+      POSTGRES_PASSWORD: ${DX_DB_PASSWORD}
+      POSTGRES_DB: directus
+    volumes:
+      - poppim-pgdata:/var/lib/postgresql/data
 volumes:
-  pm-pgdata:
+  poppim-pgdata:
