@@ -1,6 +1,7 @@
 # Shared Directus backend for the POP super-app (PIM + CRM + DAM).
 # AUTHORITATIVE copy of the deployed Coolify service "directus" (uuid nzli85mk3luzb6u7cnq5fidu) on server onwp0kd7w1w74w9yeotnoihp.
-# Live at https://data.designflow.app (pm.designflow.app kept as a grace-period alias).
+# Live at https://data.designflow.app — the backend API domain (permanent).
+# pm.designflow.app temporarily also points here; it is the PM FRONTEND's permanent home and moves to poppim-web at its launch.
 # All ${...} values are set as RUNTIME env in Coolify (never in this repo).
 # Coolify magic var SERVICE_FQDN_DIRECTUSAPP_8055 + Coolify DB service_applications.fqdn bind the domain (see AGENTS.md §11).
 # Volume KEYS are directus-pgdata / directus-extensions (renamed from poppim-* via offline volume copy on 2026-06-10).

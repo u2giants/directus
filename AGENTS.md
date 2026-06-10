@@ -2,7 +2,9 @@
 
 Canonical operating guide for the **directus** repo — the **shared backend for the POP super-app** (PIM now; CRM + DAM later, all on one Directus instance + one Postgres). Read this first; it routes you to everything else.
 
-> **Renamed 2026-06-10:** repo `poppim`→`directus`, Coolify service/containers `poppim-*`→`directus-*`, volumes `poppim-*`→`directus-*`, folder `/worksp/poppim`→`/worksp/directus`, URL `pm.designflow.app`→**`data.designflow.app`** (`pm` kept as a grace-period alias), secrets file `~/.poppim-deploy.env`→`~/.directus-deploy.env`. The three app **frontends** are separate repos/containers (`poppim-web`, `popcmr-web`, `popdam-web`); this repo is the backend only.
+> **Renamed 2026-06-10:** repo `poppim`→`directus`, Coolify service/containers `poppim-*`→`directus-*`, volumes `poppim-*`→`directus-*`, folder `/worksp/poppim`→`/worksp/directus`, URL `pm.designflow.app`→**`data.designflow.app`**, secrets file `~/.poppim-deploy.env`→`~/.directus-deploy.env`. The three app **frontends** are separate repos/containers (`poppim-web`, `popcmr-web`, `popdam-web`); this repo is the backend only.
+>
+> **Domain plan (permanent):** humans use the app domains — `pm.designflow.app` (PM frontend), `crm.designflow.app` (CRM), `dam.designflow.app` (DAM). **`data.designflow.app` is the backend API only** (frontend→Directus calls; admins may use Data Studio there). `pm` currently still points at Directus (the only UI that exists); when `poppim-web` ships, `pm` moves to the frontend container. Frontends own **no data** — one shared Postgres behind Directus serves all three apps.
 
 ## 1. Project summary
 
@@ -199,7 +201,7 @@ Deployed Directus + Postgres on Coolify at `data.designflow.app`. Two non-obviou
 | open | ClickUp → Directus migration import | Script under `pm-system/migration/` reading D1 → Directus API with `external_id` |
 | open | Orphaned Entra secret | One unused client secret exists on the SSO app (lost to a capture bug); remove for hygiene |
 | open | R2 file storage | Add R2 env to Coolify when needed (Directus uses local storage now; full design files stay on NAS) |
-| open | Retire `pm.designflow.app` | Grace alias on the directus service; once everyone uses `data.designflow.app`, drop it from Coolify sub-app `id=16` fqdn + the Entra SSO redirect URI |
+| open | Rebind `pm.designflow.app` to the PM frontend | `pm` stays the human URL for PM forever. It points at Directus only until `poppim-web` ships; at frontend launch, move `pm` off Coolify sub-app `id=16` fqdn onto the `poppim-web` app (and drop the `pm` SSO redirect from the Directus Entra app if unused) |
 | open | Clean up rename leftovers | Orphaned Coolify sub-app row `service_applications.id=15` (poppim-app, fqdn nulled) and old Docker volumes `<uuid>_poppim-pgdata` / `_poppim-extensions` (kept as backup) — remove after a few days |
 | open | Reframe docs PIM-vs-backend | This repo is now the shared backend; `pm-system/` is the PIM domain. Deeper doc reframe (and possible `pm-system/`→domain folders) when CRM/DAM arrive |
 | done | Rename backend poppim → directus | Repo/folder/service/containers/volumes → `directus`; URL → `data.designflow.app`; verified 16,534 products intact; 2026-06-10 |
