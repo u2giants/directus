@@ -30,7 +30,10 @@ async function dx(method, path, body) {
   if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}: ${json?.errors?.[0]?.message || text}`)
   return json?.data ?? json
 }
-async function login() { TOKEN = (await dx('POST', '/auth/login', { email: EMAIL, password: PASSWORD })).access_token }
+async function login() {
+  TOKEN = '' // clear any stale/expired token so the login request isn't rejected with its own old bearer
+  TOKEN = (await dx('POST', '/auth/login', { email: EMAIL, password: PASSWORD })).access_token
+}
 
 async function clickupImage(taskId) {
   const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}?include_subtasks=false`, { headers: { Authorization: CU } })
@@ -47,9 +50,16 @@ async function run() {
   let processed = 0, withImage = 0, page = 0
   const PAGE = 100
   for (;;) {
-    // re-login periodically (token ~15min)
-    if (processed && processed % 800 === 0) await login()
-    const batch = await dx('GET', `/items/product?filter[external_id][_nnull]=true&filter[cover_url][_null]=true&fields=id,external_id&limit=${PAGE}`)
+    // refresh token each page (tokens expire ~15min); resilient to transient failures
+    let batch
+    try {
+      await login()
+      batch = await dx('GET', `/items/product?filter[external_id][_nnull]=true&filter[cover_url][_null]=true&fields=id,external_id&limit=${PAGE}`)
+    } catch (e) {
+      console.log(`[${new Date().toISOString()}] batch fetch failed (${e.message}); retrying in 30s`)
+      await sleep(30000)
+      continue
+    }
     if (!batch.length) break
     for (const p of batch) {
       let url
