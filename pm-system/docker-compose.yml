@@ -35,8 +35,18 @@ services:
       AUTH_MICROSOFT_ICON: grid_view
       AUTH_MICROSOFT_ALLOW_PUBLIC_REGISTRATION: "true"   # any M365 tenant user auto-provisions
       AUTH_MICROSOFT_DEFAULT_ROLE_ID: "7c7299c9-bf6c-44f6-b952-b6983a3ca6e8"   # non-admin Designer role (instance-specific uuid)
+      # CORS + cross-subdomain session cookies so the frontends (pm-dev/pm.designflow.app)
+      # can call this API and Microsoft SSO can return into the SPA. (Frontends are sibling subdomains.)
       CORS_ENABLED: "true"
-      CORS_ORIGIN: "true"   # reflect origin (tighten to specific frontend origins for production)
+      CORS_ORIGIN: "https://pm-dev.designflow.app,https://pm.designflow.app,https://data.designflow.app"
+      CORS_CREDENTIALS: "true"
+      SESSION_COOKIE_DOMAIN: .designflow.app
+      SESSION_COOKIE_SECURE: "true"
+      SESSION_COOKIE_SAME_SITE: lax
+      REFRESH_TOKEN_COOKIE_DOMAIN: .designflow.app
+      REFRESH_TOKEN_COOKIE_SECURE: "true"
+      REFRESH_TOKEN_COOKIE_SAME_SITE: lax
+      AUTH_MICROSOFT_REDIRECT_ALLOW_LIST: https://pm-dev.designflow.app
       WEBSOCKETS_ENABLED: "true"
       TELEMETRY: "false"
     volumes:

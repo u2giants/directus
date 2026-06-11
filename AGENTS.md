@@ -149,6 +149,16 @@ Creating a Directus collection via API without `schema: {}` makes a *folder* (no
 ### Content-collection order is set via `meta.sort`
 Login lands on the first non-hidden collection in the content nav. Collections sort by `meta.sort` (set on each via `PATCH /collections/:name`); `project` and `product` are pinned first, lookup tables (retailer/buyer/licensor/…) last. Without `sort`, Directus falls back to alphabetical (which dumped users on `buyer`/`licensor`).
 
+### Cross-subdomain SSO for the frontends (session cookies)
+**Looks like:** the backend sets cookies on `.designflow.app` and reflects credentials.
+**Actually:** the SPA frontends (`pm-dev` / `pm.designflow.app`) and the API (`data.designflow.app`) are sibling subdomains, so auth uses **session cookies scoped to `.designflow.app`** (`SESSION_COOKIE_DOMAIN` / `REFRESH_TOKEN_COOKIE_DOMAIN`, `*_SECURE=true`, `*_SAME_SITE=lax`) plus `CORS_CREDENTIALS=true` and a **specific** `CORS_ORIGIN` allow-list (never `*`/reflect-all with credentials). Microsoft SSO returns into the SPA via `AUTH_MICROSOFT_REDIRECT_ALLOW_LIST` (the Entra redirect URI itself stays the backend `.../auth/login/microsoft/callback`). The frontend SDK uses `authentication('session', { credentials: 'include' })`.
+**Do not change because:** widening `CORS_ORIGIN` to reflect-all while credentials are on is a CSRF-via-CORS risk; changing the cookie domain logs everyone out.
+
+### Frontend preview runs as a raw Docker container (temporary)
+**Looks like:** a `poppim-web` container on the `coolify` network with hand-written Traefik labels, NOT a Coolify-managed app.
+**Actually:** `poppim-web` (the PIM frontend repo) is deployed at **`https://pm-dev.designflow.app`** as a **locally-built image** run via `docker run` with Traefik labels (entrypoints `http`/`https`, certresolver `letsencrypt`, port 80) — because the `gh` token lacks `write:packages` for GHCR and the repo build isn't wired into Coolify yet. This is a **temporary preview deviation** from the deploy-via-Coolify standard.
+**Replace with:** a proper Coolify app (GHCR image + GitHub Actions, or Coolify git build) at the real `pm.designflow.app` launch. To rebuild the preview: `docker build` in the `poppim-web` repo, then `docker rm -f poppim-web` + the documented `docker run`.
+
 ## 12. Credentials and environment
 
 All runtime secrets live in **Coolify** (service `nzli…` env). None are in the repo. A local convenience copy is at `/home/ai/.directus-deploy.env` (chmod 600, outside repo) — safe to delete once Coolify is the trusted source.
@@ -204,6 +214,10 @@ Deployed Directus + Postgres on Coolify at `data.designflow.app`. Two non-obviou
 | open | Rebind `pm.designflow.app` to the PM frontend | `pm` stays the human URL for PM forever. It points at Directus only until `poppim-web` ships; at frontend launch, move `pm` off Coolify sub-app `id=16` fqdn onto the `poppim-web` app (and drop the `pm` SSO redirect from the Directus Entra app if unused) |
 | open | Clean up rename leftovers | Orphaned Coolify sub-app row `service_applications.id=15` (poppim-app, fqdn nulled) and old Docker volumes `<uuid>_poppim-pgdata` / `_poppim-extensions` (kept as backup) — remove after a few days |
 | open | Reframe docs PIM-vs-backend | This repo is now the shared backend; `pm-system/` is the PIM domain. Deeper doc reframe (and possible `pm-system/`→domain folders) when CRM/DAM arrive |
+| open | Proper Coolify/CI deploy for `poppim-web` | Replace the temporary raw-docker `pm-dev` preview (§11) with a Coolify app: GHCR image + GitHub Actions, or Coolify git-build |
+| open | Confirm end-to-end Microsoft SSO into the SPA | Redirect chain verified to the MS hand-off; the post-callback return + cookie set on a real tenant login is untested — confirm on first real SSO sign-in at `pm-dev` |
+| done | PIM frontend `poppim-web` (slice 1) | React/Vite/Tailwind/shadcn app, Design theme, board + task-detail with assignees/checklist/subtasks/comments; live preview at `pm-dev.designflow.app`; 2026-06-11 |
+| done | Collaboration model | `checklist_item`, `subtask`, `product_assignee` (M2M) + app-role perms (`pm-system/add-collaboration-model.mjs`); 2026-06-11 |
 | done | Rename backend poppim → directus | Repo/folder/service/containers/volumes → `directus`; URL → `data.designflow.app`; verified 16,534 products intact; 2026-06-10 |
 | done | Deploy Directus backend to data.designflow.app | Live + verified 2026-06-10 |
 | done | Repo + folder renamed plane → poppim | — |
