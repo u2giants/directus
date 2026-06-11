@@ -2,6 +2,7 @@
 // Commands:
 //   outlook-ingest  - poll Microsoft Graph and create/route crm_email_message rows
 //   reroute         - re-evaluate unrouted crm_email_message rows
+//   fireflies-server - receive Fireflies webhooks and create crm_meeting_note rows
 //
 // ClickUp sync is intentionally omitted.
 //
@@ -11,6 +12,7 @@
 //   MS_TENANT_ID/MS_CLIENT_ID/MS_CLIENT_SECRET or AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET
 //   OUTLOOK_MAILBOX=adweck@popcre.com
 //   OUTLOOK_GATED=true
+//   FIREFLIES_API_KEY, FIREFLIES_WEBHOOK_SECRET, PORT=8787
 import { readFileSync } from 'node:fs'
 
 if (process.env.POPPIM_ENV_FILE) {
@@ -33,6 +35,7 @@ const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 const LOGIN_BASE = 'https://login.microsoftonline.com'
 const PAGE_SIZE = 50
 const LOOKBACK_MINUTES = Number(process.env.OUTLOOK_LOOKBACK_MINUTES || 20)
+const FIREFLIES_BASE = 'https://api.fireflies.ai/graphql'
 let TOKEN = ''
 
 const NOISE_DOMAINS = new Set([
@@ -247,10 +250,197 @@ async function reroute() {
   console.log(`reroute: ${updated} messages evaluated`)
 }
 
+function parseJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = ''
+    req.on('data', (chunk) => {
+      body += chunk
+      if (body.length > 2_000_000) {
+        req.destroy()
+        reject(new Error('request body too large'))
+      }
+    })
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {})
+      } catch (error) {
+        reject(error)
+      }
+    })
+    req.on('error', reject)
+  })
+}
+
+function isValidFirefliesSignature(rawBody, signature) {
+  const secret = process.env.FIREFLIES_WEBHOOK_SECRET
+  if (!secret) return true
+  if (!signature) return false
+  return crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+    .then((key) => crypto.subtle.sign('HMAC', key, new TextEncoder().encode(rawBody)))
+    .then((buf) => {
+      const expected = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+      return signature === `sha256=${expected}` || signature === expected
+    })
+}
+
+async function firefliesTranscript(meetingId) {
+  if (!process.env.FIREFLIES_API_KEY) throw new Error('FIREFLIES_API_KEY is required')
+  const query = `
+    query GetTranscript($transcriptId: String!) {
+      transcript(id: $transcriptId) {
+        id
+        title
+        date
+        duration
+        participants
+        organizer_email
+        summary {
+          action_items
+          overview
+          keywords
+          topics_discussed
+          meeting_type
+        }
+        transcript_url
+        audio_url
+        video_url
+        meeting_link
+      }
+    }
+  `
+  const res = await fetch(FIREFLIES_BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.FIREFLIES_API_KEY}` },
+    body: JSON.stringify({ query, variables: { transcriptId: meetingId } }),
+  })
+  if (!res.ok) throw new Error(`Fireflies API failed: ${res.status} ${await res.text()}`)
+  const json = await res.json()
+  if (json.errors?.length) throw new Error(`Fireflies GraphQL failed: ${json.errors[0].message}`)
+  const t = json.data?.transcript
+  if (!t) throw new Error(`Fireflies transcript not found: ${meetingId}`)
+  return t
+}
+
+function firefliesParticipants(transcript) {
+  const participants = []
+  for (const raw of Array.isArray(transcript.participants) ? transcript.participants : []) {
+    const text = String(raw)
+    const email = text.match(/<([^>]+)>/)?.[1] || (text.includes('@') ? text : '')
+    const name = email && text.includes('<') ? text.slice(0, text.indexOf('<')).trim() : text.replace(email, '').trim()
+    if (email && !participants.some((p) => p.email.toLowerCase() === email.toLowerCase())) {
+      participants.push({ name: name || email, email: email.toLowerCase() })
+    }
+  }
+  if (transcript.organizer_email && !participants.some((p) => p.email.toLowerCase() === transcript.organizer_email.toLowerCase())) {
+    participants.push({ name: 'Meeting Organizer', email: transcript.organizer_email.toLowerCase() })
+  }
+  return participants
+}
+
+async function handleFirefliesPayload(payload) {
+  const meetingId = payload?.meetingId || payload?.meeting_id || payload?.transcript?.id
+  if (!meetingId) return { success: false, errors: ['missing meetingId'] }
+
+  const existing = await dx('GET', `/items/crm_meeting_note?filter[fireflies_transcript_id][_eq]=${encodeURIComponent(meetingId)}&fields=id&limit=1`)
+  if (existing.length) return { success: true, meetingId, noteIds: [existing[0].id], skipped: 'duplicate' }
+
+  const transcript = payload?.transcript?.id ? payload.transcript : await firefliesTranscript(meetingId)
+  const participants = firefliesParticipants(transcript)
+  const participantText = participants.map((p) => `${p.name} <${p.email}>`).join(', ')
+  const summary = transcript.summary || {}
+  const actionItems = Array.isArray(summary.action_items) ? summary.action_items.join('\n') : (summary.action_items || '')
+  const route = await routeEmail({
+    subject: transcript.title || '',
+    bodyText: [summary.overview || '', actionItems, (summary.keywords || []).join(' ')].join(' '),
+    addresses: participants.map((p) => p.email),
+  })
+
+  let contact = null
+  const matchedContacts = []
+  for (const p of participants) {
+    const rows = await dx('GET', `/items/buyer?filter[email][_eq]=${encodeURIComponent(p.email)}&fields=id,email&limit=1`)
+    if (rows[0]) {
+      matchedContacts.push({ id: rows[0].id, name: p.name })
+      if (!contact && !p.email.endsWith(`@${INTERNAL_DOMAIN}`)) contact = rows[0].id
+    }
+  }
+
+  const dateValue = transcript.date ? new Date(Number(transcript.date) || transcript.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10)
+  const note = await dx('POST', '/items/crm_meeting_note', {
+    name: transcript.title || `Meeting - ${dateValue}`,
+    date: dateValue,
+    participants: participantText,
+    summary: summary.overview || '',
+    action_items: actionItems,
+    source: 'FIREFLIES_AUTO_IMPORT',
+    fireflies_transcript_id: meetingId,
+    retailer: route.retailer || null,
+    department: route.department || null,
+    opportunity: route.opportunity || null,
+    contact,
+    external_id: meetingId,
+    external_source: 'fireflies',
+  })
+
+  for (const p of matchedContacts) {
+    await dx('POST', '/items/crm_meeting_note_attendee', {
+      name: p.name,
+      meeting_note: note.id,
+      contact: p.id,
+      external_id: `${meetingId}:${p.id}`,
+      external_source: 'fireflies',
+    })
+  }
+
+  return { success: true, meetingId, noteIds: [note.id], actionItemsCount: Array.isArray(summary.action_items) ? summary.action_items.length : 0 }
+}
+
+async function firefliesServer() {
+  const { createServer } = await import('node:http')
+  const port = Number(process.env.PORT || 8787)
+  const server = createServer(async (req, res) => {
+    try {
+      if (req.method === 'GET' && req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true }))
+        return
+      }
+      if (req.method !== 'POST' || !['/s/fireflies-webhook', '/webhooks/fireflies'].includes(req.url || '')) {
+        res.writeHead(404, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'not_found' }))
+        return
+      }
+      const chunks = []
+      req.on('data', (chunk) => chunks.push(chunk))
+      await new Promise((resolve, reject) => {
+        req.on('end', resolve)
+        req.on('error', reject)
+      })
+      const raw = Buffer.concat(chunks).toString('utf8')
+      const ok = await isValidFirefliesSignature(raw, req.headers['x-hub-signature'] || req.headers['x-fireflies-signature'])
+      if (!ok) {
+        res.writeHead(401, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ success: false, errors: ['invalid signature'] }))
+        return
+      }
+      const payload = raw ? JSON.parse(raw) : {}
+      await login()
+      const result = await handleFirefliesPayload(payload)
+      res.writeHead(result.success ? 200 : 400, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify(result))
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ success: false, errors: [error.message] }))
+    }
+  })
+  server.listen(port, '0.0.0.0', () => console.log(`fireflies-server listening on ${port}`))
+}
+
 await login()
 const command = process.argv[2] || 'help'
 if (command === 'outlook-ingest') await outlookIngest()
 else if (command === 'reroute') await reroute()
+else if (command === 'fireflies-server') await firefliesServer()
 else {
-  console.log('Usage: node pm-system/crm-worker.mjs <outlook-ingest|reroute>')
+  console.log('Usage: node pm-system/crm-worker.mjs <outlook-ingest|reroute|fireflies-server>')
 }
