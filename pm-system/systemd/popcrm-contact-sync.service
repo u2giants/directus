@@ -1,0 +1,11 @@
+[Unit]
+Description=POP CRM contact sync from Directus email messages
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=ai
+WorkingDirectory=/worksp/directus
+EnvironmentFile=/home/ai/.crm-worker.env
+ExecStart=/usr/bin/node /worksp/directus/pm-system/crm-worker.mjs contact-sync
