@@ -210,11 +210,15 @@ async function run() {
   const c = loadCheckpoint()
   console.log(`[${new Date().toISOString()}] start offset ${c.offset} (uploaded=${c.uploaded} done=${c.done} noImage=${c.noImage} failed=${c.failed})`)
 
+  // SKIP_EMPTY=1 limits the run to products that already have a cover_url —
+  // useful for fixing the handful left non-migrated by transient Directus 502s
+  // without re-crawling the ~12.8k empties through the ClickUp API again.
+  const emptyFilter = process.env.SKIP_EMPTY ? '&filter[cover_url][_nempty]=true' : ''
   for (;;) {
     let batch
     try {
       await login()
-      batch = await dx('GET', `/items/product?filter[external_id][_nnull]=true&fields=id,external_id,cover_url&sort=id&limit=${PAGE}&offset=${c.offset}`)
+      batch = await dx('GET', `/items/product?filter[external_id][_nnull]=true${emptyFilter}&fields=id,external_id,cover_url&sort=id&limit=${PAGE}&offset=${c.offset}`)
     } catch (e) {
       console.log(`[${new Date().toISOString()}] batch fetch failed (${e.message}); retry in 30s`); await sleep(30000); continue
     }

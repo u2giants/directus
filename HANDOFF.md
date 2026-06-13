@@ -5,22 +5,12 @@
 ## Product cover image migration → DigitalOcean Spaces (2026-06-12)
 
 Status:
-partial — a background job is mid-run.
+**done.** 3,747 covers (originals + thumbs) on the public Space `poppim` @ `nyc3`; **0** ClickUp URLs remain; 12,787 products genuinely have no ClickUp image (2 were unrecoverable ClickUp 403s → set empty). Script: `pm-system/migration/clickup-to-spaces.mjs` (stores the verbatim original `covers/<id>.<ext>` + a sharp webp thumb `covers/<id>_thumb.webp`; repoints `product.cover_url`). Frontend deployed: board cards use the thumb, the opened modal uses the original.
 
-Done:
-- `pm-system/migration/clickup-to-spaces.mjs` downloads each product's **original** ClickUp cover (no resize), uploads it to the public Space `poppim` @ `nyc3` as `covers/<id>.<ext>`, generates a `covers/<id>_thumb.webp` thumbnail (sharp ≤400px), and repoints `product.cover_url` at the Spaces original. Idempotent + resumable (offset checkpoint `/tmp/clickup-to-spaces.checkpoint`).
-- Frontend (poppim-web, deployed): board cards use the thumb, the opened card modal uses the full original.
-- Verified end-to-end on a sample product (original 4500px JPG in the modal, ~20KB webp thumb on the card).
-
-Next action:
-- Let the job finish (≈3 h total; re-checks the ~12.8k empty covers against the ClickUp API too, which is the slow part). To resume after any interruption: `POPPIM_ENV_FILE=/home/ai/.directus-deploy.env DX_URL=https://data.designflow.app node pm-system/migration/clickup-to-spaces.mjs` (picks up from the checkpoint).
-- On completion, report final counts (uploaded / thumbOnly / noImage / **failed**) and inspect the `failed` ones — expected cause is non-decodable attachments (PDF/HEIC the CDN served as the "image"); sharp/`extFrom` reject those.
-
-Risks / watchouts:
-- **Do NOT resize the stored original** — user directive. Thumbs are a separate companion file; the original `covers/<id>.<ext>` is byte-for-byte verbatim.
-- `cover_url` was overwritten to the Spaces URL, so the original ClickUp URL is only recoverable via `external_id` + the ClickUp API (the script already does this for the `_large`/empty/old-webp cases).
-- ClickUp API is rate-limited (~100/min); the script self-throttles to ~85/min. ClickUp's `_large` thumbnail URLs are dead (403) — only the full attachment `url` works.
-- `DO_SPACES_*` creds live in mode-600 `~/.directus-deploy.env` (never commit). `sharp` is a repo devDependency (added this session) used only by this script.
+If you ever re-run it:
+- Resume from checkpoint: `POPPIM_ENV_FILE=/home/ai/.directus-deploy.env DX_URL=https://data.designflow.app node pm-system/migration/clickup-to-spaces.mjs`. Add `SKIP_EMPTY=1` (after `rm /tmp/clickup-to-spaces.checkpoint`) to fix only non-empty covers without re-crawling the 12.8k empties through the ClickUp API (~2.5 h saved).
+- Known quirk: a legitimately-`.webp` source image is stored at `covers/<id>.webp`, which the `isSpacesOriginal()` heuristic (treats `.webp` as the old resized form) does NOT count as "done" — so ~7 such products get harmlessly re-downloaded/re-uploaded each run. They display fine (original + thumb both exist). Not worth special-casing unless re-runs become routine.
+- **Do NOT resize the stored original** (user directive). `cover_url` was overwritten to the Spaces URL, so the original ClickUp URL is only recoverable via `external_id` + the ClickUp API (the script already does this). ClickUp `_large` thumbnails are dead (403); only the full attachment `url` works. `DO_SPACES_*` creds in mode-600 `~/.directus-deploy.env`; `sharp` is a repo dependency used only here.
 
 ---
 
