@@ -28,10 +28,12 @@ if (process.env.POPPIM_ENV_FILE) {
 const BASE = process.env.DX_URL || 'https://data.designflow.app'
 const EMAIL = process.env.DX_ADMIN_EMAIL, PASSWORD = process.env.DX_ADMIN_PASSWORD
 const CU_TOKEN = process.env.CLICKUP_TOKEN
+const WORKSPACE = process.env.CLICKUP_WORKSPACE_ID || '2298436'
 const LIMIT = process.env.LIMIT ? Number(process.env.LIMIT) : Infinity
 const CHECKPOINT = process.env.CHECKPOINT_FILE || '/tmp/clickup-work-import.checkpoint'
 const PAGE = 500
 const CU_MIN_INTERVAL = Number(process.env.CU_MIN_INTERVAL || 800)
+const TIME_DAYS = Number(process.env.TIME_DAYS || 3650)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let TOKEN = ''
 let cuLast = 0
@@ -73,6 +75,16 @@ async function cu(path) {
   return res.json()
 }
 
+async function cuV3(path) {
+  const wait = CU_MIN_INTERVAL - (Date.now() - cuLast)
+  if (wait > 0) await sleep(wait)
+  cuLast = Date.now()
+  const res = await fetch(`https://api.clickup.com/api/v3${path}`, { headers: { Authorization: CU_TOKEN } })
+  if (res.status === 429) { await sleep(60000); return cuV3(path) }
+  if (!res.ok) return null
+  return res.json()
+}
+
 function priorityName(task) {
   const p = task.priority
   if (!p) return null
@@ -108,7 +120,75 @@ async function comments(taskId) {
   return first?.comments || []
 }
 
-async function importProduct(product) {
+async function history(taskId) {
+  const v2 = await cu(`/task/${taskId}/history`)
+  const v2Items = v2?.history || v2?.items || []
+  if (v2Items.length) return v2Items
+  const v3 = await cuV3(`/task/${taskId}/activity`)
+  return v3?.data || v3?.activity || v3?.items || []
+}
+
+function activityText(item) {
+  const field = item.field || item.type || item.action || 'activity'
+  const before = item.before ?? item.from
+  const after = item.after ?? item.to
+  if (before !== undefined || after !== undefined) {
+    const b = typeof before === 'object' ? (before?.status || before?.name || JSON.stringify(before)) : before
+    const a = typeof after === 'object' ? (after?.status || after?.name || JSON.stringify(after)) : after
+    return `${field}: ${b ?? '—'} -> ${a ?? '—'}`
+  }
+  return item.description || item.comment_text || item.text_content || field
+}
+
+function linkRows(product, task, productByExternal) {
+  const rows = []
+  const push = (link, relationType, direction) => {
+    const linkedExternal = link.task_id || link.linked_task_id || link.depends_on || link.id || link.task?.id
+    if (!linkedExternal) return
+    const linked = productByExternal.get(String(linkedExternal))
+    rows.push({
+      product: product.id,
+      linked_product: linked?.id || null,
+      linked_external_id: String(linkedExternal),
+      linked_title: link.name || link.task?.name || linked?.name || null,
+      relation_type: relationType,
+      direction,
+      created_by: link.user?.username || link.user?.email || link.created_by || null,
+      created_at: msToIso(link.date_created || link.created_at),
+      source_id: link.id || stableId(product.external_id, relationType, direction, linkedExternal),
+      source_system: 'clickup',
+      raw: link,
+    })
+  }
+  for (const link of task.linked_tasks || []) push(link, link.link_type || 'linked', link.link_direction || 'outbound')
+  for (const link of task.dependencies || []) push(link, 'dependency', 'blocked_by')
+  return rows
+}
+
+function timeRows(product, entries) {
+  return (entries || []).map((entry) => {
+    const user = entry.user || {}
+    const tags = (entry.tags || []).map((tag) => tag.name).filter(Boolean)
+    const duration = Number(entry.duration || 0)
+    return {
+      product: product.id,
+      user_name: user.username || user.email || null,
+      user_email: user.email || null,
+      started_at: msToIso(entry.start),
+      ended_at: msToIso(entry.end),
+      duration_ms: Number.isFinite(duration) ? duration : null,
+      duration_hours: Number.isFinite(duration) && duration ? String(Math.round((duration / 3600000) * 1000) / 1000) : null,
+      billable: Boolean(entry.billable),
+      description: entry.description || null,
+      tags: tags.join(', ') || null,
+      source_id: String(entry.id || stableId(product.external_id, entry.start, entry.duration)),
+      source_system: 'clickup',
+      raw: entry,
+    }
+  })
+}
+
+async function importProduct(product, { productByExternal, timeByTask }) {
   const task = await cu(`/task/${product.external_id}?include_subtasks=false`)
   if (!task) return { failed: true }
 
@@ -126,7 +206,7 @@ async function importProduct(product) {
     clickup_raw: task,
   })
 
-  for (const collection of ['product_file', 'product_update', 'product_tag', 'product_field', 'product_activity', 'checklist_item']) {
+  for (const collection of ['product_file', 'product_update', 'product_tag', 'product_field', 'product_activity', 'product_link', 'product_time_entry', 'checklist_item']) {
     await clearRows(collection, product.id)
   }
 
@@ -194,18 +274,40 @@ async function importProduct(product) {
     raw: comment,
   })).filter((row) => row.body))
 
+  const taskHistory = await history(product.external_id)
+  const activityRows = (taskHistory || []).map((item) => ({
+    product: product.id,
+    action: item.field || item.type || item.action || 'ClickUp activity',
+    detail: activityText(item),
+    actor_name: item.user?.username || item.user?.email || null,
+    happened_at: msToIso(item.date || item.timestamp),
+    source_id: item.id || stableId(product.external_id, item.date || item.timestamp, activityText(item)),
+    source_system: 'clickup',
+    raw: item,
+  }))
+  await insertMany('product_activity', activityRows)
+
+  const links = linkRows(product, task, productByExternal)
+  await insertMany('product_link', links)
+
+  const times = timeRows(product, timeByTask.get(product.external_id))
+  await insertMany('product_time_entry', times)
+
   return {
     files: task.attachments?.length || 0,
     tags: task.tags?.length || 0,
     fields: (task.custom_fields || []).filter((f) => f.value !== undefined && f.value !== null && f.value !== '').length,
     checklist: checklistRows.length,
     comments: taskComments.length,
+    activity: activityRows.length,
+    links: links.length,
+    time: times.length,
   }
 }
 
 function loadCheckpoint() {
   if (existsSync(CHECKPOINT)) { try { return JSON.parse(readFileSync(CHECKPOINT, 'utf8')) } catch { /* ignore */ } }
-  return { index: 0, processed: 0, failed: 0, files: 0, tags: 0, fields: 0, checklist: 0, comments: 0 }
+  return { index: 0, processed: 0, failed: 0, files: 0, tags: 0, fields: 0, checklist: 0, comments: 0, activity: 0, links: 0, time: 0 }
 }
 function saveCheckpoint(c) { writeFileSync(CHECKPOINT, JSON.stringify(c)) }
 
@@ -213,22 +315,46 @@ async function fetchProducts() {
   const rows = []
   for (let offset = 0;; offset += PAGE) {
     await login()
-    const batch = await dx('GET', `/items/product?filter[external_id][_nnull]=true&fields=id,external_id,clickup_list_id,clickup_list_name&sort=id&limit=${PAGE}&offset=${offset}`)
+    const batch = await dx('GET', `/items/product?filter[external_id][_nnull]=true&fields=id,external_id,name,clickup_list_id,clickup_list_name&sort=id&limit=${PAGE}&offset=${offset}`)
     rows.push(...batch)
     if (batch.length < PAGE || rows.length >= LIMIT) break
   }
   return rows.slice(0, LIMIT)
 }
 
+async function fetchTimeEntries() {
+  const now = Date.now()
+  const start = now - TIME_DAYS * 86400000
+  const entries = []
+  for (let page = 0;; page++) {
+    const data = await cu(`/team/${WORKSPACE}/time_entries?start_date=${start}&end_date=${now}&page=${page}`)
+    const batch = data?.data || []
+    entries.push(...batch)
+    if (batch.length < 100) break
+  }
+  const byTask = new Map()
+  for (const entry of entries) {
+    const taskId = entry.task?.id
+    if (!taskId) continue
+    const list = byTask.get(String(taskId)) || []
+    list.push(entry)
+    byTask.set(String(taskId), list)
+  }
+  console.log(`[${new Date().toISOString()}] time entries ${entries.length}; matched tasks ${byTask.size}`)
+  return byTask
+}
+
 async function run() {
   await login()
   const products = await fetchProducts()
+  const productByExternal = new Map(products.map((p) => [String(p.external_id), p]))
+  const timeByTask = await fetchTimeEntries()
   const c = loadCheckpoint()
   console.log(`[${new Date().toISOString()}] products ${products.length}; start index ${c.index}`)
   for (; c.index < products.length; c.index++) {
     await login()
     try {
-      const result = await importProduct(products[c.index])
+      const result = await importProduct(products[c.index], { productByExternal, timeByTask })
       if (result.failed) c.failed++
       else {
         c.files += result.files
@@ -236,6 +362,9 @@ async function run() {
         c.fields += result.fields
         c.checklist += result.checklist
         c.comments += result.comments
+        c.activity += result.activity
+        c.links += result.links
+        c.time += result.time
       }
     } catch (e) {
       c.failed++
@@ -244,11 +373,11 @@ async function run() {
     c.processed++
     if (c.processed % 25 === 0) {
       saveCheckpoint(c)
-      console.log(`[${new Date().toISOString()}] index ${c.index + 1}/${products.length} | files ${c.files} tags ${c.tags} fields ${c.fields} checklist ${c.checklist} comments ${c.comments} failed ${c.failed}`)
+      console.log(`[${new Date().toISOString()}] index ${c.index + 1}/${products.length} | files ${c.files} tags ${c.tags} fields ${c.fields} checklist ${c.checklist} comments ${c.comments} activity ${c.activity} links ${c.links} time ${c.time} failed ${c.failed}`)
     }
   }
   saveCheckpoint(c)
-  console.log(`[${new Date().toISOString()}] DONE | files ${c.files} tags ${c.tags} fields ${c.fields} checklist ${c.checklist} comments ${c.comments} failed ${c.failed}`)
+  console.log(`[${new Date().toISOString()}] DONE | files ${c.files} tags ${c.tags} fields ${c.fields} checklist ${c.checklist} comments ${c.comments} activity ${c.activity} links ${c.links} time ${c.time} failed ${c.failed}`)
 }
 
 run().catch((e) => { console.error(e); process.exit(1) })

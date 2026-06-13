@@ -222,10 +222,43 @@ async function main() {
   ])
   await ensureRelation('product_activity', 'product', 'product')
 
-  for (const collection of ['product_file', 'product_update', 'product_tag', 'product_field', 'product_activity']) {
+  await ensureCollection('product_link', 'account_tree', [
+    ['product', m2o],
+    ['linked_product', m2o],
+    ['linked_external_id', string],
+    ['linked_title', text],
+    ['relation_type', string],
+    ['direction', string],
+    ['created_by', string],
+    ['created_at', timestamp],
+    ['source_id', string],
+    ['source_system', string],
+    ['raw', json],
+  ])
+  await ensureRelation('product_link', 'product', 'product')
+  await ensureRelation('product_link', 'linked_product', 'product', 'SET NULL')
+
+  await ensureCollection('product_time_entry', 'timer', [
+    ['product', m2o],
+    ['user_name', string],
+    ['user_email', string],
+    ['started_at', timestamp],
+    ['ended_at', timestamp],
+    ['duration_ms', integer],
+    ['duration_hours', string],
+    ['billable', { type: 'boolean', meta: { interface: 'boolean' }, schema: { default_value: false } }],
+    ['description', text],
+    ['tags', text],
+    ['source_id', string],
+    ['source_system', string],
+    ['raw', json],
+  ])
+  await ensureRelation('product_time_entry', 'product', 'product')
+
+  for (const collection of ['product_file', 'product_update', 'product_tag', 'product_field', 'product_activity', 'product_link', 'product_time_entry']) {
     await grantAppPolicy(collection, 'read')
   }
-  for (const collection of ['product_file', 'product_update', 'product_tag', 'product_field']) {
+  for (const collection of ['product_file', 'product_update', 'product_tag', 'product_field', 'product_link', 'product_time_entry']) {
     await grantAppPolicy(collection, 'create')
     await grantAppPolicy(collection, 'update')
     await grantAppPolicy(collection, 'delete')
