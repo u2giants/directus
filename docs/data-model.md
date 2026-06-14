@@ -375,7 +375,18 @@ Kanban: group `product` by `stage`, filter by `business_unit`.
 - Buyer UUIDs → resolve to `buyer.name` where possible.
 - Ancient open items (4–5 yr) → import with `closure_reason = abandoned`.
 - Use Directus `external_id`/`external_source` = the ClickUp id on every row for traceability.
-- Dead boards (Freelancers Generic) → don't import.
+- Do not leave live ClickUp lists out of Poppim. The 2026-06-14 parity pass imports non-archived ClickUp list tasks into live `product` rows across POP, Spruce, and designflow/Software lists; the audit matched 17,859 live ClickUp task ids to 17,859 Poppim external ids with 0 missing and 0 extra.
+
+### 7.1 Attachment storage parity
+
+What changed:
+Imported `product_file` attachments are copied from ClickUp source URLs into DigitalOcean Spaces by `pm-system/migration/clickup-files-to-spaces.mjs`. The frontend should read `thumbnail_url` / `stored_url` before falling back to ClickUp URLs.
+
+Why:
+ClickUp attachment URLs are not durable. On 2026-06-14, 20,234 of 20,281 `product_file` rows were stored in Spaces. The remaining 47 rows have source URLs that return 404 or 200 with zero bytes even when probed with `CLICKUP_TOKEN`.
+
+Future sessions should:
+Treat those 47 rows as source-byte recovery from another source, not as missing product/card rows. Rerun the Spaces migration only after ClickUp source URLs or replacement files are available.
 
 ---
 

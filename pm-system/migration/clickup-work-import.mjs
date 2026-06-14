@@ -35,6 +35,7 @@ const CHECKPOINT = process.env.CHECKPOINT_FILE || '/tmp/clickup-work-import.chec
 const PAGE = 500
 const CU_MIN_INTERVAL = Number(process.env.CU_MIN_INTERVAL || 800)
 const TIME_DAYS = Number(process.env.TIME_DAYS || 3650)
+const MAX_UPDATE_BODY = Number(process.env.MAX_UPDATE_BODY || 180000)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let TOKEN = ''
 let cuLast = 0
@@ -195,6 +196,50 @@ function timeRows(product, entries) {
   })
 }
 
+function splitText(value, size = MAX_UPDATE_BODY) {
+  const text = String(value || '')
+  if (text.length <= size) return [text]
+  const parts = []
+  for (let i = 0; i < text.length; i += size) parts.push(text.slice(i, i + size))
+  return parts
+}
+
+function compactCommentRaw(comment) {
+  return {
+    id: comment.id || null,
+    date: comment.date || null,
+    user: comment.user || null,
+    resolved: comment.resolved ?? null,
+    assignee: comment.assignee || null,
+    group_assignee: comment.group_assignee || null,
+    reactions: comment.reactions || null,
+  }
+}
+
+function updateRowsFromComments(product, taskComments) {
+  const rows = []
+  for (const comment of taskComments) {
+    const body = comment.text_content || comment.comment_text || ''
+    if (!body) continue
+    const parts = splitText(body)
+    const baseId = comment.id || stableId(product.external_id, comment.date, body)
+    parts.forEach((part, index) => {
+      rows.push({
+        product: product.id,
+        body: parts.length === 1 ? part : `[part ${index + 1}/${parts.length}]\n${part}`,
+        author_name: comment.user?.username || comment.user?.email || null,
+        author_email: comment.user?.email || null,
+        happened_at: msToIso(comment.date),
+        kind: parts.length === 1 ? 'comment' : 'comment_part',
+        source_id: parts.length === 1 ? baseId : `${baseId}:part:${index + 1}`,
+        source_system: 'clickup',
+        raw: compactCommentRaw(comment),
+      })
+    })
+  }
+  return rows
+}
+
 async function importProduct(product, { productByExternal, timeByTask }) {
   const task = await cu(`/task/${product.external_id}?include_subtasks=false`)
   if (!task) return { failed: true }
@@ -275,17 +320,7 @@ async function importProduct(product, { productByExternal, timeByTask }) {
   await insertMany('checklist_item', checklistRows)
 
   const taskComments = await comments(product.external_id)
-  await insertMany('product_update', taskComments.map((comment) => ({
-    product: product.id,
-    body: comment.text_content || comment.comment_text || '',
-    author_name: comment.user?.username || comment.user?.email || null,
-    author_email: comment.user?.email || null,
-    happened_at: msToIso(comment.date),
-    kind: 'comment',
-    source_id: comment.id || stableId(product.external_id, comment.date, comment.text_content),
-    source_system: 'clickup',
-    raw: comment,
-  })).filter((row) => row.body))
+  await insertMany('product_update', updateRowsFromComments(product, taskComments))
 
   const taskHistory = await history(product.external_id)
   const activityRows = (taskHistory || []).map((item) => ({

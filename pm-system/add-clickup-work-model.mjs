@@ -189,6 +189,7 @@ async function main() {
   await ensureField('checklist_item', 'group_name', string)
   await ensureField('checklist_item', 'source_id', string)
   await ensureField('checklist_item', 'source_system', string)
+  await ensureFieldType('checklist_item', 'label', text)
   await ensureFieldType('checklist_item', 'sort', decimalSort)
 
   await ensureCollection('product_file', 'attach_file', [

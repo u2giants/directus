@@ -201,6 +201,26 @@ During the ClickUp-to-Poppim cutover, ClickUp still changed after the original b
 Future sessions should:
 When a ClickUp card exists but Poppim cannot find it, first compare the ClickUp task id against `product.external_id`. If missing, run the incremental product script, then run `clickup-work-import.mjs` with `PRODUCT_IDS=<created ids>` to hydrate files/comments/custom fields, and `clickup-to-spaces.mjs` with the same `PRODUCT_IDS` to store cover originals + thumbs in Spaces.
 
+### Full ClickUp workspace parity import is list-wide
+What changed:
+`pm-system/migration/clickup-import-workspace-lists.mjs` imports every non-archived ClickUp list task into live `product` rows, including POP admin/project lists, Spruce lists, and designflow software sprint lists. On 2026-06-14 the live audit matched ClickUp exactly: 23 live lists, 17,859 unique ClickUp tasks/subtasks, 17,859 Poppim external ids, 0 missing, 0 extra.
+
+Why:
+The original import scope was too narrow; `Miniso` was only the visible symptom. The user explicitly wants all ClickUp information to have an in-use Poppim home, not an archive/dead area.
+
+Future sessions should:
+For broad parity checks, compare live ClickUp task ids against the union of `product.external_id` and `project.external_id`. Do not assume only `Licensing Management` matters. The importer maps Spruce lists to `Spruce Line`, POP lists to `POP Creations`, and designflow sprint lists to `Software`.
+
+### Product-file attachments are stored in Spaces, with a dead-source tail
+What changed:
+`pm-system/migration/clickup-files-to-spaces.mjs` copies imported `product_file.source_url` attachments from ClickUp into DigitalOcean Spaces as unchanged originals under `product-files/<product>/<file>.<ext>` and creates image thumbnails under `product-files/<product>/<file>_thumb.webp`. After the 2026-06-14 pass, Directus had 20,281 `product_file` rows, 20,234 stored in Spaces, and 47 remaining unstored source URLs.
+
+Why:
+ClickUp attachment URLs are not durable storage. The PM frontend now prefers `thumbnail_url`/`stored_url`, but some old ClickUp attachment URLs return 404 or 200 with zero bytes even with the ClickUp token, so those source bytes cannot be copied from the current URL.
+
+Future sessions should:
+Treat the 47 unstored rows as source-byte recovery work, not missing database rows. Verify by probing `product_file.source_url` anonymously and with `CLICKUP_TOKEN`; if ClickUp still returns 0 bytes/404, recover from another source (old export/NAS/user upload) rather than rerunning the same URL loop.
+
 ## 12. Credentials and environment
 
 All runtime secrets live in **Coolify** (service `nzli…` env). None are in the repo. A local convenience copy is at `/home/ai/.directus-deploy.env` (chmod 600, outside repo) — safe to delete once Coolify is the trusted source.
@@ -250,7 +270,8 @@ Deployed Directus + Postgres on Coolify at `data.designflow.app`. Two non-obviou
 | open | Vendor role row-scoping | Vendor role has no product access yet; add per-vendor filter (user→factory/vendor map) so a vendor sees only their own products |
 | open | CRM/DAM read Entra groups | Wire the CRM and DAM to read the six `POP PIM ·` groups for roles (read-only consumers; one writer = Directus) |
 | open | Verify new-user notify Flow end-to-end | "New user role reminder" Flow is active but only fires on a real `provider=microsoft` sign-in; confirm on next real SSO signup |
-| open | ClickUp → Directus migration import | Script under `pm-system/migration/` reading D1 → Directus API with `external_id` |
+| done | ClickUp → Directus migration import | 2026-06-14: live ClickUp audit matched 23 live lists / 17,859 unique tasks against 17,859 Poppim external ids; 0 missing, 0 extra. |
+| partial | Product-file source-byte recovery | 20,234 / 20,281 `product_file` rows are stored in Spaces. Remaining 47 ClickUp source URLs return 404 or 0 bytes even with token; recover from old exports/NAS/user uploads if required. |
 | open | Orphaned Entra secret | One unused client secret exists on the SSO app (lost to a capture bug); remove for hygiene |
 | done | Product cover image storage | 2026-06-12: migrated **3,747** product covers to **DigitalOcean Spaces** (originals + thumbs); **0** ClickUp URLs remain, 12,787 products genuinely have no image (2 were unrecoverable ClickUp 403s → set empty). Chose Spaces (S3, public Space `poppim` @ `nyc3`) over R2. `pm-system/migration/clickup-to-spaces.mjs` is the single migration: for each product it downloads the **original** ClickUp cover (preferring a working ClickUp URL already in `cover_url`, else re-deriving it from the ClickUp API via `external_id` — the `_large` thumbnails ClickUp disabled now 403), uploads the bytes **verbatim, no resize** to `covers/<id>.<ext>`, ALSO generates a webp thumbnail (sharp, ≤400px) at `covers/<id>_thumb.webp`, and repoints `product.cover_url` at the Spaces original URL. Frontend: board cards use the thumb (`coverThumbUrl` derived in `src/domain/products/adapters.ts`), the opened card modal uses the original. Resumable (offset checkpoint `/tmp/clickup-to-spaces.checkpoint`), idempotent (already-migrated originals get a thumb backfill via a HEAD check), ClickUp-rate-limited ~85/min. Creds in mode-600 `~/.directus-deploy.env` (`DO_SPACES_*`). **User directive: store originals, do NOT resize** (a sharp→webp≤1000px _replace_ pass was reverted; thumbs are a separate companion file, the original is untouched). Directus's own file storage is still local; design files stay on NAS. |
 | done | Rebind `pm.designflow.app` to the PM frontend | 2026-06-11 — dropped `pm` from Coolify sub-app `id=16` fqdn (now `data` only); `pm` added to `AUTH_MICROSOFT_REDIRECT_ALLOW_LIST`; `pm.designflow.app` now serves `poppim-web`. Data Studio is `data.designflow.app` only. |
