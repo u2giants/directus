@@ -50,6 +50,7 @@ const integer = { type: 'integer', meta: { interface: 'input' }, schema: {} }
 const timestamp = { type: 'timestamp', meta: { interface: 'datetime' }, schema: {} }
 const json = { type: 'json', meta: { interface: 'input-code', options: { language: 'json' } }, schema: {} }
 const m2o = { type: 'uuid', meta: { interface: 'select-dropdown-m2o' }, schema: {} }
+const decimalSort = { type: 'decimal', meta: { interface: 'input', hidden: true }, schema: { numeric_precision: 10, numeric_scale: 3 } }
 
 async function fields(collection) {
   return new Set((await api('GET', `/fields/${collection}`)).map((f) => f.field))
@@ -60,6 +61,17 @@ async function ensureField(collection, field, def) {
   if (existing.has(field)) return
   await api('POST', `/fields/${collection}`, { field, ...def })
   console.log(`  + ${collection}.${field}`)
+}
+
+async function ensureFieldType(collection, field, def) {
+  const current = await api('GET', `/fields/${collection}/${field}`)
+  const precision = current.schema?.numeric_precision
+  const scale = current.schema?.numeric_scale
+  const targetPrecision = def.schema?.numeric_precision
+  const targetScale = def.schema?.numeric_scale
+  if (current.type === def.type && precision === targetPrecision && scale === targetScale) return
+  await api('PATCH', `/fields/${collection}/${field}`, def)
+  console.log(`  ~ ${collection}.${field} -> ${def.type}`)
 }
 
 async function ensureCollection(collection, icon, collectionFields) {
@@ -159,6 +171,7 @@ async function main() {
   await ensureField('checklist_item', 'group_name', string)
   await ensureField('checklist_item', 'source_id', string)
   await ensureField('checklist_item', 'source_system', string)
+  await ensureFieldType('checklist_item', 'sort', decimalSort)
 
   await ensureCollection('product_file', 'attach_file', [
     ['product', m2o],
