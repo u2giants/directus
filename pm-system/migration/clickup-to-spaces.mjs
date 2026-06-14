@@ -46,6 +46,7 @@ const SP_KEY = process.env.DO_SPACES_KEY, SP_SECRET = process.env.DO_SPACES_SECR
 const SP_HOST = `${BUCKET}.${REGION}.digitaloceanspaces.com`
 const PUBLIC_BASE = `https://${SP_HOST}`
 const CHECKPOINT = process.env.CHECKPOINT_FILE || '/tmp/clickup-to-spaces.checkpoint'
+const PRODUCT_IDS = (process.env.PRODUCT_IDS || '').split(',').map((id) => id.trim()).filter(Boolean)
 const PAGE = 100
 const CONCURRENCY = 4
 const CU_MIN_INTERVAL = 700 // ms between ClickUp API calls (~85/min, under the ~100/min cap)
@@ -214,6 +215,15 @@ async function run() {
   // useful for fixing the handful left non-migrated by transient Directus 502s
   // without re-crawling the ~12.8k empties through the ClickUp API again.
   const emptyFilter = process.env.SKIP_EMPTY ? '&filter[cover_url][_nempty]=true' : ''
+  if (PRODUCT_IDS.length) {
+    const filter = encodeURIComponent(JSON.stringify({ id: { _in: PRODUCT_IDS } }))
+    const batch = await dx('GET', `/items/product?filter=${filter}&fields=id,external_id,cover_url&limit=-1`)
+    await pmap(batch, CONCURRENCY, async (p) => { await migrateOne(p, c); c.processed++ })
+    saveCheckpoint(c)
+    console.log(`[${new Date().toISOString()}] DONE targeted: uploaded ${c.uploaded} done ${c.done} thumbOnly ${c.thumbOnly||0} noImage ${c.noImage} failed ${c.failed}`)
+    return
+  }
+
   for (;;) {
     let batch
     try {

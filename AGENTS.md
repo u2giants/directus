@@ -191,6 +191,16 @@ The PM frontend's Licensed board mirrors ClickUp's Board view by showing top-lev
 Future sessions should:
 Do not filter nested `clickup_raw` JSON from the frontend. Use the first-class ClickUp fields, and use `pm-system/migration/backfill-clickup-status-fields.mjs` after adding/repairing those fields. `checklist_item.sort` is decimal because ClickUp order indexes are decimal-like values; do not change it back to integer.
 
+### Live ClickUp board drift needs an incremental product sync
+What changed:
+`pm-system/migration/clickup-incremental-products.mjs` creates Directus `product` rows for current ClickUp list tasks that are missing by `external_id`. It defaults to the Licensing Management list (`13194624`), top-level open tasks only, and prints created Directus product ids for follow-up imports.
+
+Why:
+During the ClickUp-to-Poppim cutover, ClickUp still changed after the original bulk import. Example: ClickUp task `868jzm9k2` (`Miniso`) was live on the Licensing board but had no Directus product, so Poppim correctly rendered nothing for that search until the product row was created.
+
+Future sessions should:
+When a ClickUp card exists but Poppim cannot find it, first compare the ClickUp task id against `product.external_id`. If missing, run the incremental product script, then run `clickup-work-import.mjs` with `PRODUCT_IDS=<created ids>` to hydrate files/comments/custom fields, and `clickup-to-spaces.mjs` with the same `PRODUCT_IDS` to store cover originals + thumbs in Spaces.
+
 ## 12. Credentials and environment
 
 All runtime secrets live in **Coolify** (service `nzli…` env). None are in the repo. A local convenience copy is at `/home/ai/.directus-deploy.env` (chmod 600, outside repo) — safe to delete once Coolify is the trusted source.
