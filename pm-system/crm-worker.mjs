@@ -123,6 +123,12 @@ function domainOf(address) {
   return String(address || '').split('@')[1]?.toLowerCase() || ''
 }
 
+function domainCandidates(domain) {
+  const parts = String(domain || '').toLowerCase().split('.').filter(Boolean)
+  if (parts.length <= 2) return parts.length ? [parts.join('.')] : []
+  return [parts.join('.'), parts.slice(-2).join('.')]
+}
+
 function isNoiseDomain(domain) {
   return NOISE_DOMAINS.has(domain) || NOISE_PREFIXES.some((prefix) => domain.startsWith(prefix))
 }
@@ -266,18 +272,24 @@ function pickUniqueBest(scoredRows, threshold) {
 }
 
 async function matchingRetailersByDomain(domain, displayNames = {}) {
+  const candidates = domainCandidates(domain)
   const rows = await queryItems('retailer', {
     filter: {
       _and: [
         { customer_status: { _in: ['ACTIVE_CUSTOMER', 'POTENTIAL_CUSTOMER'] } },
-        { _or: [{ domain: { _contains: domain } }, { routing_aliases: { _contains: domain } }] },
+        {
+          _or: candidates.flatMap((candidate) => [
+            { domain: { _contains: candidate } },
+            { routing_aliases: { _contains: candidate } },
+          ]),
+        },
       ],
     },
     fields: ['id', 'name', 'domain', 'routing_aliases', 'customer_status'],
     limit: 20,
   })
   if (rows.length === 1) return rows[0]
-  return applySharedDomainRule(domain, rows, displayNames)
+  return candidates.map((candidate) => applySharedDomainRule(candidate, rows, displayNames)).find(Boolean) || null
 }
 
 async function matchRetailerByAlias(normalizedSubject) {
@@ -643,9 +655,15 @@ async function reroute() {
 }
 
 async function ensureRetailerForDomain(domain) {
+  const candidates = domainCandidates(domain)
   const existing = await queryItems('retailer', {
-    filter: { domain: { _contains: domain } },
-    fields: ['id', 'name', 'domain'],
+    filter: {
+      _or: candidates.flatMap((candidate) => [
+        { domain: { _contains: candidate } },
+        { routing_aliases: { _contains: candidate } },
+      ]),
+    },
+    fields: ['id', 'name', 'domain', 'routing_aliases'],
     limit: 2,
   })
   if (existing[0]) return existing[0].id
@@ -672,7 +690,17 @@ async function contactSync() {
   for (const address of addresses) {
     const domain = domainOf(address)
     if (!retailerByDomain.has(domain)) {
-      const before = await queryItems('retailer', { filter: { domain: { _contains: domain } }, fields: ['id'], limit: 1 })
+      const candidates = domainCandidates(domain)
+      const before = await queryItems('retailer', {
+        filter: {
+          _or: candidates.flatMap((candidate) => [
+            { domain: { _contains: candidate } },
+            { routing_aliases: { _contains: candidate } },
+          ]),
+        },
+        fields: ['id'],
+        limit: 1,
+      })
       const retailer = await ensureRetailerForDomain(domain)
       if (!before.length) retailersCreated += 1
       retailerByDomain.set(domain, retailer)

@@ -41,6 +41,7 @@ const pk = () => ({ field: 'id', type: 'uuid', schema: { is_primary_key: true, h
 const field = (type, iface, note, schema = {}, extra = {}) => ({ type, meta: { interface: iface, note, ...extra }, schema })
 const string = (note) => field('string', 'input', note)
 const text = (note) => field('text', 'input-multiline', note)
+const logo = (note) => field('string', 'pop-company-logo', note, {}, { readonly: true })
 const bool = (note) => field('boolean', 'boolean', note)
 const date = (note) => field('date', 'datetime', note)
 const timestamp = (note) => field('timestamp', 'datetime', note)
@@ -51,20 +52,20 @@ const select = (choices, note) => field('string', 'select-dropdown', note, {}, {
 
 const choices = {
   customerStatus: [
-    ['Active Customer', 'ACTIVE_CUSTOMER'],
-    ['Potential Customer', 'POTENTIAL_CUSTOMER'],
-    ['Other', 'OTHER'],
-    ['New Company', 'UNASSIGNED'],
+    ['Active Customer', 'ACTIVE_CUSTOMER', '#22c55e'],
+    ['Potential Customer', 'POTENTIAL_CUSTOMER', '#eab308'],
+    ['Not a Customer', 'OTHER', '#94a3b8'],
+    ['New Company', 'UNASSIGNED', '#3b82f6'],
   ],
   chainType: [
-    ['Off-Price', 'OFF_PRICE'],
-    ['Specialty', 'SPECIALTY'],
-    ['Value', 'VALUE'],
-    ['Mass Market', 'MASS_MARKET'],
-    ['Grocery/Drug', 'GROCERY_DRUG'],
-    ['eCom', 'ECOM'],
-    ['Club', 'CLUB'],
-    ['Other', 'OTHER'],
+    ['Off-Price', 'OFF_PRICE', '#f97316'],
+    ['Specialty', 'SPECIALTY', '#d946ef'],
+    ['Value', 'VALUE', '#22c55e'],
+    ['Mass Market', 'MASS_MARKET', '#6366f1'],
+    ['Grocery/Drug', 'GROCERY_DRUG', '#84cc16'],
+    ['eCom', 'ECOM', '#06b6d4'],
+    ['Club', 'CLUB', '#ec4899'],
+    ['Other', 'OTHER', '#94a3b8'],
   ],
   contactType: [
     ['Buyer', 'BUYER'],
@@ -194,7 +195,7 @@ const choices = {
     ['haiku 4.5 $1/$5', 'CLAUDE_HAIKU_4_5'],
   ],
 }
-for (const [k, v] of Object.entries(choices)) choices[k] = v.map(([text, value]) => ({ text, value }))
+for (const [k, v] of Object.entries(choices)) choices[k] = v.map(([text, value, color]) => ({ text, value, ...(color ? { color } : {}) }))
 
 let collectionSet, fieldsByCollection, relationSet
 
@@ -227,6 +228,13 @@ async function ensureField(collection, name, def) {
   console.log(`  + ${collection}.${name}`)
 }
 
+async function updateFieldMeta(collection, name, meta) {
+  const fields = await fieldsOf(collection)
+  if (!fields.has(name)) return
+  await api('PATCH', `/fields/${collection}/${name}`, { meta })
+  console.log(`  · ${collection}.${name} meta`)
+}
+
 async function ensureRelation(collection, name, related, onDelete = 'SET NULL') {
   const key = `${collection}.${name}`
   if (relationSet.has(key)) return
@@ -245,6 +253,47 @@ async function ensureProvenance(collection) {
   await ensureField(collection, 'external_source', string('Source system for external_id'))
 }
 
+async function configureRetailerLayout() {
+  const fields = [
+    ['logo_url', { sort: 1, width: 'half', readonly: true, translations: [{ language: 'en-US', translation: 'Logo' }] }],
+    ['name', { sort: 2, width: 'half' }],
+    ['customer_status', { sort: 3, width: 'half', options: { choices: choices.customerStatus } }],
+    ['chain_type', { sort: 4, width: 'half', options: { choices: choices.chainType } }],
+    ['domain', { sort: 5, width: 'half' }],
+    ['routing_aliases', { sort: 6, width: 'half' }],
+    ['so_patterns', { sort: 7, width: 'half', note: 'S.O. patterns used by email routing', translations: [{ language: 'en-US', translation: 'S.O. Patterns' }] }],
+    ['primary_salesperson', { sort: 8, width: 'half' }],
+    ['account_owner', { sort: 9, width: 'half' }],
+    ['aliases', { sort: 20, width: 'half' }],
+    ['resale_restriction', { sort: 21, width: 'half' }],
+    ['notes', { sort: 22, width: 'full' }],
+    ['external_source', { sort: 90, width: 'half', hidden: true }],
+    ['external_id', { sort: 91, width: 'half', hidden: true }],
+  ]
+
+  for (const [name, meta] of fields) {
+    await updateFieldMeta('retailer', name, meta)
+  }
+}
+
+async function configureDepartmentLayout() {
+  const fields = [
+    ['retailer', { sort: 1, width: 'half', required: true, note: 'Required customer/account. Departments cannot exist outside a customer.' }],
+    ['name', { sort: 2, width: 'half', required: true }],
+    ['category', { sort: 3, width: 'half', options: { choices: choices.departmentCategory } }],
+    ['division', { sort: 4, width: 'half', options: { choices: choices.division } }],
+    ['primary_buyer', { sort: 5, width: 'half' }],
+    ['active', { sort: 6, width: 'half' }],
+    ['sort', { sort: 7, width: 'half', hidden: true }],
+    ['external_source', { sort: 90, width: 'half', hidden: true }],
+    ['external_id', { sort: 91, width: 'half', hidden: true }],
+  ]
+
+  for (const [name, meta] of fields) {
+    await updateFieldMeta('crm_department', name, meta)
+  }
+}
+
 async function run() {
   if (!EMAIL || !PASSWORD) throw new Error('DX_ADMIN_EMAIL and DX_ADMIN_PASSWORD are required')
   TOKEN = (await api('POST', '/auth/login', { email: EMAIL, password: PASSWORD })).access_token
@@ -253,12 +302,14 @@ async function run() {
   for (const collection of ['retailer', 'buyer', 'factory']) await ensureProvenance(collection)
 
   await ensureField('retailer', 'domain', string('CRM routing domain / primary domain'))
+  await ensureField('retailer', 'logo_url', logo('Company logo preview derived from domain'))
   await ensureField('retailer', 'routing_aliases', text('CRM email-routing aliases'))
   await ensureField('retailer', 'so_patterns', text('Sales-order patterns used by email routing'))
   await ensureField('retailer', 'customer_status', select(choices.customerStatus, 'CRM customer status'))
   await ensureField('retailer', 'chain_type', select(choices.chainType, 'CRM chain type'))
   await ensureM2O('retailer', 'primary_salesperson', 'directus_users', 'Primary CRM salesperson')
   await ensureM2O('retailer', 'account_owner', 'directus_users', 'CRM account owner')
+  await configureRetailerLayout()
 
   await ensureField('buyer', 'first_name', string('CRM contact first name'))
   await ensureField('buyer', 'last_name', string('CRM contact last name'))
@@ -282,6 +333,7 @@ async function run() {
   await ensureM2O('crm_department', 'retailer', 'retailer', 'Company/account')
   await ensureM2O('crm_department', 'primary_buyer', 'buyer', 'Primary buyer/contact')
   await ensureM2O('buyer', 'department', 'crm_department', 'CRM department')
+  await configureDepartmentLayout()
 
   await ensureCollection('crm_opportunity', 'paid', 'CRM opportunity / program')
   await ensureProvenance('crm_opportunity')

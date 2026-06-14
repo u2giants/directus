@@ -1,13 +1,13 @@
 # How the Business Works — POP Creations & Spruce Line
 
-**Purpose.** This document explains how this company actually designs, approves, and finishes a product — who touches it, in what order, through every level of approval (including licensors), from a first idea to a finished, shipped item. It also records how the people who run the work *wish* the process ran. It is written for someone (human or AI) who needs to understand the **business and its workflow**. It deliberately contains **nothing about the software** used to track the work — no tools, no databases, no tickets. The companion document `pm-system-design.md` covers the software.
+**Purpose.** This document explains how this company actually designs, approves, and finishes a product — who touches it, in what order, through every level of approval (including licensors), from a first idea to a finished, shipped item. It also records how the people who run the work *wish* the process ran. It is written for someone (human or AI) who needs to understand the **business and its workflow** with no prior context. It deliberately avoids software-design instructions; the companion document `pm-system-design.md` covers the system to build.
 
-**Where this knowledge comes from.** 77 structured interview answers across four rounds (May–June 2026) with the three people who run the two lines:
+**Where this knowledge comes from.** This is a synthesis of the month-long ClickUp monitoring, the D1 evidence pack, and 77 structured interview answers across four rounds (May–June 2026) with the three people who run the two lines:
 - **Jessica Cortázar** — Project Manager, POP Creations (the licensed line).
 - **Liz (Elizabeth) Parkin** — Creative Director, POP Creations.
 - **Jennifer (Jen) Chaffier** — Creative Director, Spruce Line (the generic line).
 
-Quotes are verbatim and attributed by person.
+Quotes are verbatim and attributed by person. The raw evidence lives in D1 and in `docs/product-flow-evidence-pack.md`; this file keeps only the nuance that helps someone understand the business itself.
 
 ---
 
@@ -29,6 +29,12 @@ The company runs **two parallel businesses** that share people and factories but
 | Process weight | Heavyweight, many gated stages | Lightweight, fewer stages |
 
 **The licensors (POP only):** Disney, Marvel, Star Wars (LucasFilm), Warner Bros, DC Comics, NBCUniversal, Paramount/Nickelodeon, Peanuts, SEGA, Strawberry Shortcake (WildBrain CPLP), WWE, One Piece (TOEI), Care Bears, Coca-Cola, Sesame Street. Each licensor owns "properties" (e.g., within Disney: "Mickey Mouse," "Mickey and Friends," "Princess Tiana") and publishes **style guides** that dictate how their characters and assets may be used — and *when* (style guides are date-gated to selling seasons).
+
+One source of confusion in the old tracking system was that the same words were used loosely for different business objects. In this document:
+
+- **Project / offer** means a body of work for a buyer, retailer, season, account, or theme.
+- **SKU / style-numbered product** means a committed product identity that can be approved, manufactured, ordered, shipped, and reused.
+- **Design / collection** means creative work that may become a product later, but is not automatically one yet.
 
 ---
 
@@ -80,19 +86,23 @@ Where the *ideas* come from (Jessica): "a shopping trip to one of the retailers 
 - **Wholesale sublicensors** — online sellers (e.g., Stallion Art, Iconick) buy the product and resell it under their own brand, sublicensing the IP. Their designs still go through the **full licensor approval process**. These are designed by outside teams, which makes them unusually hard to manage (see §9).
 - **Internal / new development** — products built proactively, then presented.
 
+The old ClickUp data showed the same flows repeating across thousands of records. The important lesson was not each individual row; it was the **shape** of the work. Lists that looked like flat task boards were actually mixtures of parent project cards and child SKU/product tasks. For example, the largest licensed list contained 7,281 parent cards and 4,280 child tasks, while a buyer-refresh list contained only 264 parent cards but 2,446 child tasks. That proved that the business does not run on one generic "task" object. It runs on linked projects, products, and reusable creative work.
+
+The monitoring also showed that a lot of work is not visible as "moving a stage." Much of the real activity is editing descriptions, attaching images, pasting file paths, adding comments, changing assignments, and updating content. A person new to the business should understand that **status columns tell only part of the story**; the files, notes, specs, and handoffs are often where the work really happens.
+
 ---
 
 # PART A — POP CREATIONS: The Licensed Product Journey
 
-## 4. The two things the business is really tracking
+## 4. The three things the business is really tracking
 
-Everything in POP is one of two objects.
+Everything in POP is one of three objects.
 
 **An offer (a "project").** One offer, to one buyer, at one retailer, for one season. For example: *"Julie Greer at Burlington for Valentines 2027,"* or *"Alice Zhu at Dollar General for Fall/Winter 2026."* An offer carries the **brief**: the buyer, the retailer, the season, which licensors and properties are in play, which product types the buyer wants, the on-shelf date, and any restrictions. It exists so the creative team has a single reference and doesn't have to memorize the details. As Jessica put it, "each buyer purchases certain types of products and specific properties within each license. All this information is included… as a brief so the creative designer can refer to it during the process."
 
 The brief carries real constraints: **the style guides used to source the design assets must be valid for the date the product will be on the shelf** — licensors date-gate their style guides to selling seasons.
 
-**A picked product (a "SKU").** When a buyer selects a design from a presentation, that selection becomes a specific product to be built, carried all the way through approval and production. A picked product carries: its full approval history, its link back to the offer it came from, its licensor submission numbers, its sample photos, and the order history of which retailers bought it and when.
+**A picked product (a "SKU").** When a buyer selects a design from a presentation, that selection usually becomes a specific product to be built, carried all the way through approval and production. More precisely, a SKU is created whenever something must be submitted to a licensor's system; that can be a buyer pick, an internal concept, a sample-first effort, or any other item the company wants the licensor to approve. A picked product carries: its full approval history, its link back to the offer it came from, its licensor submission numbers, its sample photos, and the order history of which retailers bought it and when.
 
 There is also a third, quieter category the business currently *loses*: **the preliminary designs that were shown to a buyer but not picked.** These are real creative work, but today they vanish (see §10 — this is the company's single biggest pain point).
 
@@ -106,7 +116,7 @@ Here is the path a licensed product travels, and who touches it at each step.
 | 2 | **Preliminary designs created** | Creative Designer | The creative team designs concept options for the buyer, working from the brief. |
 | 3 | **Presentation to buyer** | Sales (Adam) | Sales shows the preliminary designs to the buyer. |
 | 4 | **Buyer picks + format chosen** | Buyer | The buyer selects designs and picks the **format** for each — material, size, specifications. Only now does a pick become a product to build. |
-| 5 | **Product (SKU) created + description written** | Creative Designer | Each pick becomes a tracked product. The creative designer writes the description (material, size, artwork description) and prepares the final art files. |
+| 5 | **Product (SKU) created + description written** | Creative Designer | Each pick, or any other concept that needs licensor approval, becomes a tracked product. The creative designer writes the description (material, size, artwork description) and prepares the final art files. |
 | 6 | **Licensing sheet + packaging built** | Technical Designer | Using the art files, the technical designer builds the **licensing sheet** (the formal spec the licensor reviews) and designs the packaging. |
 | 7 | **Internal Creative Director review** | Creative Director (Liz) | **Nothing goes to a licensor without Liz's approval.** She reviews the licensing sheet and the design. This is the internal gate. |
 | 8 | **Concept submitted to licensor** | Licensing Team | The licensing team submits the concept and packaging to the licensor's portal. |
@@ -124,6 +134,8 @@ Here is the path a licensed product travels, and who touches it at each step.
 | 19 | **Shipping & import** | Production Team | The licensor's submission form (the "Brand Assurance" record) is printed and attached to the shipping boxes alongside the trademark authorization, so the goods can ship and clear import. |
 
 A product is **"approved"** at step 9 only when the licensor returns it with no feedback or corrections. A product is **"finished"** at step 18 (Production Approved).
+
+The old status names preserve an important business truth: not every open item is truly active work. Some items are actively moving, some are waiting on a buyer, some are waiting on a licensor, some are waiting on factory information, some are approved-but-unsold inventory, and some are effectively abandoned but never formally closed. The business needs those lifecycle meanings because "open" alone is too vague.
 
 ## 6. The licensor relationship in depth
 
@@ -165,6 +177,8 @@ Some licensors are also far more demanding on revisions than others — SEGA in 
 
 **PI / Product Integrity.** A test report certifying that the materials used (and their quantities) are non-toxic, non-hazardous, and safe. **Only some licensors require it.** When required, the licensing team receives the report by email and submits it to the licensor. Because most licensors don't require it, it is tracked inconsistently today.
 
+Wholesale sublicensor products create a special strain on this approval process. They still need licensor approval, but the creative work comes from outside teams that often do not understand licensing guidelines. Liz still has to review and give feedback, but she is correcting people she does not manage, which makes the work slower and more difficult than normal retail product development.
+
 ## 7. Costing, sourcing, and manufacturing constraints
 
 Before a product can be quoted or built, a **costing sheet** is created — and this is the source of a lot of downstream rework.
@@ -174,6 +188,8 @@ Before a product can be quoted or built, a **costing sheet** is created — and 
 - The **sourcing team / China team** reviews it to confirm or clarify restrictions, construction, and materials, and **obtains the die lines**.
 
 The problem: the **manufacturing constraints** — die lines, the number of colors a factory can print, the printing technique, where legal lines must be placed — are often **known only to the art director**, who "usually specifies the restrictions, but sometimes forgets to share them with the creative team, or sometimes she's unaware of them." The mismatch is then discovered during sampling, forcing the design and licensing sheet to be redone. When both the creative and technical designers understand the product-type constraints up front (based on the agreed factory cost), products go through with far fewer revisions.
+
+This is not just a documentation problem. It is a visibility problem: designers need manufacturing constraints early enough to design correctly, while pricing and sensitive costing information still belongs with sourcing, sales, and leadership. The business needs to separate **constraints designers need** from **prices designers should not see**.
 
 ## 8. How long the work takes
 
@@ -219,6 +235,8 @@ A product that reaches Production Approved is **completed** — the happy path. 
 
 **Approved-but-unsold concepts.** A large pool of concepts get licensor approval but then stall — the buyer passed on price, the production timing didn't fit, or the order was canceled. These are **not dead**; they are approved inventory that should be re-offered to buyers, but today the work is effectively wasted because nobody re-surfaces it.
 
+This is one of the most important distinctions in the business: **canceled**, **abandoned**, **complete**, **parked**, and **reusable** are not the same state. A canceled product may be dead because cost, licensing, sampling, or buyer interest failed. An approved-but-unsold concept is different: the company already paid for creative and licensor approval, so it may be valuable inventory for a future buyer.
+
 ## 10. Where the POP process breaks today (process problems, in the team's words)
 
 **1. Lost preliminary designs — the #1 pain point.** Designs shown to a buyer but not picked are tied to that one buyer's presentation and effectively disappear. *"Designs that are lost are lost several times a week. We've tried to reuse these designs for other projects… but it involves manually searching through past presentations"* (Jessica). The team only ever organizes what was *selected*; the rest is lost creative work.
@@ -238,6 +256,10 @@ A product that reaches Production Approved is **completed** — the happy path. 
 
 **6. Manufacturing constraints surface too late.** As in §7 — constraints known only to the art director aren't shared with designers until sampling reveals the mismatch.
 
+**7. The work record is scattered across several places.** ClickUp may show the stage, but the reasons and details often live in Teams messages, emails, Illustrator markups, NAS paths, PDFs, screenshots, costing tools, or someone's memory. That scattering is why the business repeatedly loses context even when a product card technically exists.
+
+**8. Activity is not the same as stage movement.** The monitoring showed frequent description/content edits, attachments, comments, and assignment changes. Those are not administrative noise; they are how product work actually advances. A business process that only watches stage changes will miss a lot of the real work.
+
 ## 11. How Jessica and Liz wish the POP process ran
 
 - **Nothing creative is ever lost.** Every design — picked or not — stays findable and reusable, searchable by license, property, product type, and season, so the team can re-offer past work instead of starting from scratch.
@@ -245,6 +267,7 @@ A product that reaches Production Approved is **completed** — the happy path. 
 - **Designers see their constraints while they design.** Die lines, color counts, printing techniques, and materials should be visible at design time, so the art director is no longer a single point of relay and rework drops.
 - **Each person owns and advances their own step**, with clear handoffs to the next person — so the PM manages exceptions instead of pushing every product through every stage by hand. For this to work, updating has to be effortless and incremental (you report the first 5 of 20 art files as they're done, not all 20 at the end).
 - **Liz keeps her judgment but loses the chaos.** She doesn't want a rigid checklist imposed on her aesthetic review — that runs on 20 years of expertise. She *does* want her submissions tracked in one place instead of scattered across messages, and she wants product specs (how each product is made) in front of her when she reviews.
+- **Lifecycle states are explicit.** A product should be visibly active, waiting, parked, reusable, canceled, abandoned, or complete, instead of quietly sitting in an old status for years.
 
 ---
 
@@ -262,6 +285,8 @@ Spruce is organized differently from POP. Jen tracks three distinct kinds of thi
 
 **A style-numbered product.** When a buyer actually commits — selects specific designs and either places an order or requests a sample — those selections become **style-numbered products**. The style number is the product's permanent identity, and all of that product's files are findable by it. **Only style-numbered items are "real products."** The hundreds of designs in a trend collection are not.
 
+This is the biggest Spruce nuance: a trend collection may contain hundreds of useful designs, but that does not mean hundreds of products exist. A product exists only once an account-specific commitment creates a style number or sample/order path. That is why a searchable library for Spruce cannot assume every design already has production-ready art; many concepts are still only presentation-level creative inventory.
+
 ## 13. The journey, step by step
 
 | # | Step | Who | What happens |
@@ -278,6 +303,8 @@ Spruce is organized differently from POP. Jen tracks three distinct kinds of thi
 | 10 | **Order → production** | Factory (via Yuchen) | When there's an order, the team waits for **Yuchen's email** with the factory deadline, then preps and sends files for production. |
 
 **Approvals are entirely internal + buyer.** Jen finalizes; Adam gets buyer sign-off on art changes; once the buyer approves and an order is placed, it goes to production. **Jen and Mal review artwork and tech packs**; Jen handles purchase-order review for accuracy; Mal handles sample-request approvals. There is no licensor anywhere.
+
+In Spruce, the board is organized by lifecycle stage because Jen needs to see what needs follow-up next, not because every account follows an identical path. Some labels are true process stages, while others are category-like buckets such as Wall Art, Floor Coverings, Storage, or Seasonal. That mixture is part of how the line actually operates: category, account, and lifecycle are all relevant at once.
 
 ## 14. Accounts behave differently — and the process must flex
 
@@ -300,6 +327,10 @@ Most trend collections are **not** account-specific — **except all storage des
 
 **Cross-line.** The two businesses **share product development but not art** — a product format might be shared, but licensed and generic artwork stay separate.
 
+**General presentations.** Spruce maintains account-agnostic presentation boards so Adam can self-serve material for sales conversations. These are organized by areas such as New Formats, Trend Boards, Garden, Floor Coverings, Storage, Seasonal, Wall Decor, Wall Art, and General. They are not the same as account projects, even when they later feed one.
+
+**Failed experiments.** Not every historical board represents a live process. The "Freelancers Generic" board was an attempt to manage freelance art development, but the work became too inconsistent and hard to track. Most of that model was abandoned or pulled back in-house. A new person should not treat every old board as a process to preserve.
+
 ## 16. Where the Spruce process breaks today
 
 - **Chasing people.** Jen's single biggest frustration: *"Having to chase down information or remind people to complete their part of the product lifecycle."*
@@ -307,6 +338,7 @@ Most trend collections are **not** account-specific — **except all storage des
 - **No timeline tracking.** The design team doesn't track order timelines at all; the only hard date is the factory deadline that arrives in Yuchen's email. Buyers (especially Burlington) often place orders at the last minute, leaving little prep time.
 - **No revision tracking.** Buyer change requests travel by message, marked-up file, or email, with nothing formally recorded.
 - **A failed freelancer experiment.** An attempt to develop new art through many freelancers became unmanageable; most work was brought back in-house and the freelancer pool was culled to a few reliable people.
+- **Presentation-level work can be mistaken for product work.** Because general collections, account projects, selections PDFs, and style-numbered products all coexist, it is easy to overcount what is actually in production. Spruce needs the distinction between "creative inventory," "buyer project," and "real product" to stay clear.
 
 ## 17. How Jen wishes the Spruce process ran
 
@@ -333,8 +365,12 @@ Although POP and Spruce run different processes, they share people (Adam in sale
 | **Reacting instead of planning the season** | scrambling each season | wants a design calendar from history |
 | **Constraints/pricing surface too late** | manufacturing constraints known only to the art director | factory pricing changes hidden until sampling |
 | **Sales needs a clean status picture** | "list of all projects for the same retailer" | "a list for Adam on the exact status of all projects" |
+| **The old tracking mixed business concepts** | project cards, SKU cards, admin tasks, tags, and stale statuses lived together | collections, account projects, category buckets, selections, and style-numbered products lived together |
+| **File and note context matters as much as stage** | art files, licensing sheets, NAS paths, PDFs, and markups carry the actual work | presentations, selections PDFs, Teams/email revisions, and factory deadline emails carry the actual work |
 
 The deepest shared wish across all three people is the same: **one place where the work lives, nothing gets lost, and the team can get ahead of the season instead of chasing it.**
+
+The deepest shared modeling lesson is also the same: the business needs to know **what kind of thing** it is looking at before it can manage it. A project, a product, a design, a collection, a submission, a sample, and a file handoff are related, but they are not interchangeable.
 
 ---
 

@@ -80,7 +80,7 @@ async function run() {
     const canWrite = ['Designer', 'Sales', 'Licensing'].includes(role)
     for (const collection of CRM_COLLECTIONS) {
       await grant(role, policy, collection, 'read')
-      if (canWrite) {
+      if (canWrite && (collection !== 'retailer' || role === 'Sales')) {
         await grant(role, policy, collection, 'create')
         await grant(role, policy, collection, 'update')
       }

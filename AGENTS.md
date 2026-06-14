@@ -23,7 +23,8 @@ Always start with **`AGENTS.md`**. Then load only what the task needs:
 | Task / question | Read these | Usually skip |
 |---|---|---|
 | Quick orientation | `README.md`, `AGENTS.md` | the `docs/` deep dives |
-| Understand the business/process | `docs/business-process.md` | software docs |
+| Understand the business/process | `docs/product-flow-evidence-pack.md`, then `docs/business-process.md` | software docs |
+| Understand what ClickUp monitoring proved | `docs/product-flow-evidence-pack.md`, `BUSINESS_INTELLIGENCE.md`, live D1 when needed | implementation docs unless changing schema |
 | Why Directus (vs Plane/Twenty) | `docs/platform-decision-report.md`, `docs/plane-free-edition-gaps.md` | — |
 | Build/extend the PM system | `AGENTS.md`, `docs/data-model.md`, `docs/pm-system-design.md`, `pm-system/README.md` | legacy analytics docs |
 | Change the Directus schema / Flows / roles | `docs/data-model.md`, `pm-system/apply-schema.mjs` | deployment docs unless infra changes |
@@ -38,7 +39,7 @@ Always start with **`AGENTS.md`**. Then load only what the task needs:
 | Path | What | Ownership |
 |---|---|---|
 | `pm-system/` | **The Directus PM system** — `apply-schema.mjs` (schema/config migration), `seed-and-verify.mjs`, `docker-compose.yml`, `schema-snapshot.yaml`, `README.md` | project-owned |
-| `docs/` | Business + design docs (business-process, data-model, pm-system-design, platform-decision-report, directus-execution-plan, plane-free-edition-gaps) | project-owned |
+| `docs/` | Business + design docs (product-flow-evidence-pack, business-process, data-model, pm-system-design, platform-decision-report, directus-execution-plan, plane-free-edition-gaps) | project-owned |
 | `integrations/worker/` | Legacy `plane-integrations` Cloudflare Worker (ClickUp webhooks + NL query) — live | project-owned (legacy) |
 | `scripts/` | Legacy Python: ClickUp snapshot, D1 product-table builder, analysis | project-owned (legacy) |
 | `BUSINESS_INTELLIGENCE.md` | Data-evidence layer (volumes, SLA tables, pipeline defs) | project-owned |

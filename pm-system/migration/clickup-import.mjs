@@ -1,5 +1,7 @@
 // ClickUp -> Directus migration importer.
-// Idempotent (upsert by external_id). Reference records matched/created by name.
+// Idempotent (upsert by external_id). Product references are matched/created by
+// name, except retailer/customer. Retailers are owned by CRM/Twenty data and
+// must already exist; this importer must not create customer placeholders.
 // Classification: a task is a `project` ONLY if it is a top-level task (no parent) in an
 // offer-level list; every other task (subtasks, and all tasks in SKU-level lists) is a `product`.
 // Env: DX_URL, DX_ADMIN_EMAIL, DX_ADMIN_PASSWORD, CU_TOKEN, [ONLY_LIST=<id>], [DRY=1]
@@ -49,6 +51,13 @@ async function getOrCreateRef(col, name) {
   const found = await dx('GET', `/items/${col}?filter[name][_eq]=${encodeURIComponent(key)}&fields=id&limit=1`);
   const id = found?.[0]?.id || (await dx('POST', `/items/${col}`, { name: key })).id;
   return (ref[col][ck] = id);
+}
+async function getExistingRef(col, name) {
+  if (!name) return null; const key = String(name).trim(); if (!key) return null;
+  const ck = key.toLowerCase(); if (ref[col][ck]) return ref[col][ck]; if (DRY) return (ref[col][ck] = 'DRY');
+  const found = await dx('GET', `/items/${col}?filter[name][_eq]=${encodeURIComponent(key)}&fields=id&limit=1`);
+  if (found?.[0]?.id) return (ref[col][ck] = found[0].id);
+  throw new Error(`Missing ${col} "${key}" — create/select it in CRM first`);
 }
 async function ensureFields() {
   for (const col of ['project', 'product', 'design']) {
@@ -119,7 +128,7 @@ async function main() {
   async function upProject(task, bu) {
     const cf = resolveCustomFields(task);
     const p = { title: task.name || '(untitled)', business_unit: bu, external_id: task.id, external_source: 'clickup', status: /complete|done|prod apprv/i.test(task.status?.status || '') ? 'won' : 'active' };
-    if (cf.retailer) p.retailer = await getOrCreateRef('retailer', cf.retailer);
+    if (cf.retailer) p.retailer = await getExistingRef('retailer', cf.retailer);
     if (cf.buyer) p.buyer = await getOrCreateRef('buyer', cf.buyer);
     if (DRY) return;
     const ex = existing.project[task.id];
@@ -130,7 +139,7 @@ async function main() {
     const cf = resolveCustomFields(task);
     const p = { name: task.name || '(untitled)', business_unit: bu, external_id: task.id, external_source: 'clickup', code: task.custom_id || task.id };
     const st = ref.stage[(bu + '|' + (task.status?.status || '')).toLowerCase()]; if (st) p.stage = st;
-    if (cf.retailer) p.retailer = await getOrCreateRef('retailer', cf.retailer);
+    if (cf.retailer) p.retailer = await getExistingRef('retailer', cf.retailer);
     if (cf.buyer) p.buyer = await getOrCreateRef('buyer', cf.buyer);
     if (cf.factory) p.factory = await getOrCreateRef('factory', cf.factory);
     if (cf.product_type) p.product_type = await getOrCreateRef('product_type', cf.product_type);
