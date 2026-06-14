@@ -181,6 +181,16 @@ ClickUp evidence had repetitive product flow, but the custom PM app needs synthe
 Future sessions should:
 Treat those counts as the verified post-backfill baseline. The script is safe to dry-run by default; only write with `APPLY=1`. Do not delete/recreate backfilled rows unless you intentionally change the `external_source` strategy and have verified the production counts first.
 
+### ClickUp work-data import preserves board semantics
+What changed:
+`pm-system/add-clickup-work-model.mjs` adds first-class ClickUp status and parent fields (`clickup_status`, `clickup_status_type`, `clickup_status_color`, `clickup_status_order`, `clickup_parent_id`, `clickup_top_level_parent_id`) plus work-data collections (`product_file`, `product_update`, `product_tag`, `product_field`, `product_activity`, `product_link`, `product_time_entry`). `pm-system/migration/clickup-work-import.mjs` keeps those fields current and JSON-stringifies scalar custom-field values before inserting `product_field.value_json`.
+
+Why:
+The PM frontend's Licensed board mirrors ClickUp's Board view by showing top-level open/custom tasks from the `Licensing Management` list, sorted by ClickUp updated time. ClickUp subtasks were previously imported as product rows, which inflated Poppim card counts unless `clickup_parent_id` is available as a normal field.
+
+Future sessions should:
+Do not filter nested `clickup_raw` JSON from the frontend. Use the first-class ClickUp fields, and use `pm-system/migration/backfill-clickup-status-fields.mjs` after adding/repairing those fields. `checklist_item.sort` is decimal because ClickUp order indexes are decimal-like values; do not change it back to integer.
+
 ## 12. Credentials and environment
 
 All runtime secrets live in **Coolify** (service `nzli…` env). None are in the repo. A local convenience copy is at `/home/ai/.directus-deploy.env` (chmod 600, outside repo) — safe to delete once Coolify is the trusted source.
