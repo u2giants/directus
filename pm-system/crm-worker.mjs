@@ -5,6 +5,7 @@
 //   fireflies-server - receive Fireflies webhooks and create crm_meeting_note rows
 //   contact-sync    - create missing retailer/buyer records from ingested email addresses
 //   summarize       - refresh opportunity AI summaries from routed emails
+//   apply-ignore-rules - bulk-apply active ignore rules to unrouted email
 //
 // ClickUp sync is intentionally omitted.
 //
@@ -71,6 +72,16 @@ const CONTACT_SYNC_NOISE_DOMAINS = new Set([
 ])
 const NOISE_SENDER_PATTERNS = ['no-reply@', 'noreply@', 'donotreply@', 'notifications@', 'support@', 'billing@']
 const PO_PATTERN = /\b([DS]\d{4})\b/gi
+const DEFAULT_SO_PATTERNS = [
+  /\bSO[\s#\-]?(\d{5,12})\b/gi,
+  /\bSales\s+Order[\s:#\-]*(\d{5,12})\b/gi,
+  /\bOrder\s*[:#]?\s*(\d{6,12})\b/gi,
+]
+const DEFAULT_PO_PATTERNS = [
+  /\bPO[\s#\-]?(\d{5,12})\b/gi,
+  /\bPurchase\s+Order[\s:#\-]*(\d{5,12})\b/gi,
+  PO_PATTERN,
+]
 const ROUTABLE_STATUSES = ['UNROUTED', 'COMPANY_ONLY', 'COMPANY_DEPT', 'CUSTOMER_EMAIL_NO_COMPANY']
 const MODEL_VALUE_MAP = {
   GPT_5_4: 'openai/gpt-5.4',
@@ -155,6 +166,42 @@ function extractAddresses(text) {
 
 function extractPoNumbers(text) {
   return [...new Set((String(text || '').match(PO_PATTERN) || []).map((x) => x.toUpperCase()))]
+}
+
+function compiledRetailerPatterns(patternText) {
+  const out = []
+  for (const line of String(patternText || '').split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    try {
+      out.push(new RegExp(trimmed, 'gi'))
+    } catch (error) {
+      console.warn(`Invalid retailer S.O. pattern "${trimmed}": ${error.message}`)
+    }
+  }
+  return out
+}
+
+function runNumberPatterns(text, patterns) {
+  const found = new Set()
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0
+    let match
+    while ((match = pattern.exec(String(text || ''))) !== null) {
+      const value = String(match[1] || match[0] || '').trim().toUpperCase()
+      if (value) found.add(value)
+      if (match[0] === '') pattern.lastIndex += 1
+    }
+  }
+  return [...found]
+}
+
+function extractOrderNumbers(text, retailerPatterns = '') {
+  const custom = compiledRetailerPatterns(retailerPatterns)
+  return {
+    soNumbers: runNumberPatterns(text, [...DEFAULT_SO_PATTERNS, ...custom]),
+    poNumbers: runNumberPatterns(text, [...DEFAULT_PO_PATTERNS, ...custom]),
+  }
 }
 
 function fuzzyScore(query, target) {
@@ -341,10 +388,23 @@ async function findDepartment(retailer, addresses) {
 }
 
 async function matchOpportunity({ retailer, department, searchText }) {
-  const poNumbers = extractPoNumbers(searchText)
+  let retailerPatterns = ''
+  if (retailer) {
+    const rows = await queryItems('retailer', {
+      filter: { id: { _eq: retailer } },
+      fields: ['id', 'so_patterns'],
+      limit: 1,
+    })
+    retailerPatterns = rows[0]?.so_patterns || ''
+  }
+  const { soNumbers, poNumbers } = extractOrderNumbers(searchText, retailerPatterns)
   for (const po of poNumbers) {
+    const filter = {
+      _or: [{ production_po_number: { _eq: po } }, { import_po_number: { _eq: po } }],
+    }
+    if (retailer) filter._and = [{ retailer: { _eq: retailer } }, { _or: filter._or }]
     const rows = await queryItems('crm_opportunity', {
-      filter: { production_po_number: { _eq: po }, ...(retailer ? { retailer: { _eq: retailer } } : {}) },
+      filter: retailer ? filter._and ? { _and: filter._and } : filter : filter,
       fields: ['id', 'retailer', 'department'],
       limit: 2,
     })
@@ -357,8 +417,8 @@ async function matchOpportunity({ retailer, department, searchText }) {
     fields: ['id', 'name', 'retailer', 'department', 'sales_order_number', 'production_po_number'],
     limit: 1000,
   })
-  const lower = String(searchText || '').toLowerCase()
-  const so = activeRows.find((row) => row.sales_order_number && lower.includes(String(row.sales_order_number).toLowerCase()))
+  const lowerNumbers = soNumbers.map((x) => x.toLowerCase())
+  const so = activeRows.find((row) => row.sales_order_number && lowerNumbers.includes(String(row.sales_order_number).toLowerCase()))
   if (so) return { method: 'SALES_ORDER_NUMBER', row: so }
 
   const fuzzy = pickUniqueBest(activeRows.map((row) => ({ row, score: Math.max(fuzzyScore(searchText, row.name), fuzzyScore(searchText, row.production_po_number)) })), 0.72)
@@ -435,14 +495,14 @@ async function summarizeOpportunity(opportunityId) {
   if (!opportunityId || !process.env.OPENROUTER_API_KEY) return false
   const [opportunity] = await queryItems('crm_opportunity', {
     filter: { id: { _eq: opportunityId } },
-    fields: ['id', 'name', 'stage', 'retailer', 'department', 'production_po_number', 'sales_order_number'],
+    fields: ['id', 'name', 'stage', 'retailer', 'department', 'production_po_number', 'sales_order_number', 'project'],
     limit: 1,
   })
   if (!opportunity) return false
   const emails = await queryItems('crm_email_message', {
     filter: { opportunity: { _eq: opportunityId } },
-    fields: ['subject', 'sender', 'received_at', 'body_preview'],
-    limit: 40,
+    fields: ['subject', 'sender', 'received_at', 'body_preview', 'routing_method'],
+    limit: 60,
     sort: ['-received_at'],
   })
   if (!emails.length) return false
@@ -458,7 +518,14 @@ async function summarizeOpportunity(opportunityId) {
     body: JSON.stringify({
       model,
       messages: [
-        { role: 'system', content: 'Summarize this CRM opportunity for an account manager. Return JSON with summary, nextStep, risk, and updatedAt.' },
+        {
+          role: 'system',
+          content: [
+            'Summarize this CRM opportunity for an account manager.',
+            'Return strict JSON with: summary, nextStep, risk, status, people, actionItems, blockers, decisions, timeline, updatedAt.',
+            'Preserve active facts from the email history. Keep summary human-readable and concise.',
+          ].join(' '),
+        },
         { role: 'user', content: JSON.stringify({ opportunity, emails }) },
       ],
       temperature: 0.2,
@@ -476,6 +543,57 @@ async function summarizeOpportunity(opportunityId) {
     ai_state: JSON.stringify({ ...parsed, updatedAt: new Date().toISOString() }),
   })
   return true
+}
+
+async function chatOpportunity(opportunityId, question) {
+  if (!opportunityId || !question || !process.env.OPENROUTER_API_KEY) return ''
+  const [opportunity] = await queryItems('crm_opportunity', {
+    filter: { id: { _eq: opportunityId } },
+    fields: ['id', 'name', 'stage', 'ai_summary', 'ai_state', 'retailer.name', 'department.name', 'project.title', 'production_po_number', 'sales_order_number'],
+    limit: 1,
+  })
+  if (!opportunity) return ''
+  const [emails, notes, tasks] = await Promise.all([
+    queryItems('crm_email_message', {
+      filter: { opportunity: { _eq: opportunityId } },
+      fields: ['subject', 'sender', 'received_at', 'body_preview', 'routing_method'],
+      limit: 40,
+      sort: ['-received_at'],
+    }),
+    queryItems('crm_note', {
+      filter: { opportunity: { _eq: opportunityId } },
+      fields: ['title', 'body', 'action_items', 'source'],
+      limit: 25,
+      sort: ['-id'],
+    }),
+    queryItems('crm_task', {
+      filter: { opportunity: { _eq: opportunityId } },
+      fields: ['title', 'body', 'status', 'due_at'],
+      limit: 25,
+      sort: ['status', 'due_at'],
+    }),
+  ])
+  const model = await routingModel('opportunity_summary_model')
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      'HTTP-Referer': DX,
+      'X-Title': 'POP CRM Opportunity Chat',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: 'Answer as a CRM assistant using only the provided Directus CRM context. If the context is insufficient, say what is missing. Keep the answer concise and action-oriented.' },
+        { role: 'user', content: JSON.stringify({ question, opportunity, emails, notes, tasks }) },
+      ],
+      temperature: 0.2,
+    }),
+  })
+  if (!res.ok) throw new Error(`OpenRouter chat failed: ${res.status} ${await res.text()}`)
+  const json = await res.json()
+  return String(json.choices?.[0]?.message?.content || '').trim()
 }
 
 async function updateOpportunitySummary(opportunityId) {
@@ -617,6 +735,12 @@ async function outlookIngest() {
     if (gated && !addresses.some((addr) => !addr.endsWith(`@${INTERNAL_DOMAIN}`))) continue
     const bodyText = message.body?.content || message.bodyPreview || ''
     const route = await routeEmail({ subject: message.subject || '', bodyText, addresses, displayNames: displayNameMap(message) })
+    let retailerPatterns = ''
+    if (route.retailer) {
+      const rows = await queryItems('retailer', { filter: { id: { _eq: route.retailer } }, fields: ['so_patterns'], limit: 1 })
+      retailerPatterns = rows[0]?.so_patterns || ''
+    }
+    const detected = extractOrderNumbers(bodyText, retailerPatterns)
     await dx('POST', '/items/crm_email_message', {
       name: message.subject || '(no subject)',
       subject: message.subject || '(no subject)',
@@ -625,7 +749,8 @@ async function outlookIngest() {
       received_at: message.receivedDateTime?.slice(0, 10),
       body_preview: message.bodyPreview || '',
       outlook_message_id: message.id,
-      detected_po_numbers: extractPoNumbers(bodyText).join(', '),
+      detected_so_numbers: detected.soNumbers.join(', '),
+      detected_po_numbers: detected.poNumbers.join(', '),
       external_id: message.id,
       external_source: 'outlook',
       ...route,
@@ -733,6 +858,42 @@ async function summarize() {
     if (await summarizeOpportunity(id)) updated += 1
   }
   console.log(`summarize: ${updated}/${ids.length} opportunities refreshed`)
+}
+
+function subjectMatchesRule(subject, rule) {
+  const pattern = String(rule.pattern || '').trim().toLowerCase()
+  if (!pattern) return false
+  const normalized = normalizeSubject(subject).toLowerCase()
+  const matchType = rule.match_type || 'CONTAINS'
+  return (
+    (matchType === 'EXACT' && normalized === pattern) ||
+    (matchType === 'STARTS_WITH' && normalized.startsWith(pattern)) ||
+    (matchType === 'CONTAINS' && normalized.includes(pattern))
+  )
+}
+
+async function applyIgnoreRules() {
+  const [rules, emails] = await Promise.all([
+    readAll('crm_ignore_rule', 'fields=id,pattern,match_type,emails_skipped'),
+    readAll('crm_email_message', 'filter[routing_status][_eq]=UNROUTED&fields=id,subject'),
+  ])
+  let skipped = 0
+  const counts = new Map()
+  for (const email of emails) {
+    const rule = rules.find((r) => subjectMatchesRule(email.subject, r))
+    if (!rule) continue
+    await dx('PATCH', `/items/crm_email_message/${email.id}`, {
+      routing_status: 'SKIPPED',
+      routing_method: 'AUTO_SKIP',
+    })
+    counts.set(rule.id, (counts.get(rule.id) || 0) + 1)
+    skipped += 1
+  }
+  for (const rule of rules) {
+    const count = counts.get(rule.id) || 0
+    if (count) await dx('PATCH', `/items/crm_ignore_rule/${rule.id}`, { emails_skipped: Number(rule.emails_skipped || 0) + count })
+  }
+  console.log(`apply-ignore-rules: ${skipped} emails skipped by ${counts.size} rules`)
 }
 
 function parseJsonBody(req) {
@@ -887,7 +1048,14 @@ async function firefliesServer() {
   const { createServer } = await import('node:http')
   const port = Number(process.env.PORT || 8787)
   const server = createServer(async (req, res) => {
-    const jsonHeaders = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type,x-hub-signature,x-fireflies-signature' }
+    const origin = req.headers.origin || ''
+    const allowedOrigin = /^https:\/\/crm(-dev)?\.designflow\.app$/.test(origin) ? origin : 'https://crm.designflow.app'
+    const jsonHeaders = {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': allowedOrigin,
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Allow-Headers': 'content-type,x-hub-signature,x-fireflies-signature',
+    }
     try {
       if (req.method === 'OPTIONS') {
         res.writeHead(204, jsonHeaders)
@@ -897,6 +1065,27 @@ async function firefliesServer() {
       if (req.method === 'GET' && req.url === '/health') {
         res.writeHead(200, jsonHeaders)
         res.end(JSON.stringify({ ok: true }))
+        return
+      }
+      if (req.method === 'POST' && req.url === '/s/opportunity-chat') {
+        const chunks = []
+        req.on('data', (chunk) => chunks.push(chunk))
+        await new Promise((resolve, reject) => {
+          req.on('end', resolve)
+          req.on('error', reject)
+        })
+        const cookie = req.headers.cookie || ''
+        const me = await fetch(`${DX}/users/me?fields=id`, { headers: { cookie } })
+        if (!me.ok) {
+          res.writeHead(401, jsonHeaders)
+          res.end(JSON.stringify({ error: 'unauthorized' }))
+          return
+        }
+        await login()
+        const payload = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+        const answer = await chatOpportunity(payload.opportunityId, payload.question)
+        res.writeHead(200, jsonHeaders)
+        res.end(JSON.stringify({ answer }))
         return
       }
       if (req.method !== 'POST' || !['/s/fireflies-webhook', '/webhooks/fireflies'].includes(req.url || '')) {
@@ -937,6 +1126,7 @@ else if (command === 'reroute') await reroute()
 else if (command === 'fireflies-server') await firefliesServer()
 else if (command === 'contact-sync') await contactSync()
 else if (command === 'summarize') await summarize()
+else if (command === 'apply-ignore-rules') await applyIgnoreRules()
 else {
-  console.log('Usage: node pm-system/crm-worker.mjs <outlook-ingest|reroute|fireflies-server|contact-sync|summarize>')
+  console.log('Usage: node pm-system/crm-worker.mjs <outlook-ingest|reroute|fireflies-server|contact-sync|summarize|apply-ignore-rules>')
 }
