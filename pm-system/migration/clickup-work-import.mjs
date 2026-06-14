@@ -30,6 +30,7 @@ const EMAIL = process.env.DX_ADMIN_EMAIL, PASSWORD = process.env.DX_ADMIN_PASSWO
 const CU_TOKEN = process.env.CLICKUP_TOKEN
 const WORKSPACE = process.env.CLICKUP_WORKSPACE_ID || '2298436'
 const LIMIT = process.env.LIMIT ? Number(process.env.LIMIT) : Infinity
+const PRODUCT_IDS = (process.env.PRODUCT_IDS || '').split(',').map((id) => id.trim()).filter(Boolean)
 const CHECKPOINT = process.env.CHECKPOINT_FILE || '/tmp/clickup-work-import.checkpoint'
 const PAGE = 500
 const CU_MIN_INTERVAL = Number(process.env.CU_MIN_INTERVAL || 800)
@@ -312,6 +313,10 @@ function loadCheckpoint() {
 function saveCheckpoint(c) { writeFileSync(CHECKPOINT, JSON.stringify(c)) }
 
 async function fetchProducts() {
+  if (PRODUCT_IDS.length) {
+    const filter = encodeURIComponent(JSON.stringify({ id: { _in: PRODUCT_IDS } }))
+    return dx('GET', `/items/product?filter=${filter}&fields=id,external_id,name,clickup_list_id,clickup_list_name&limit=-1`)
+  }
   const rows = []
   for (let offset = 0;; offset += PAGE) {
     await login()
