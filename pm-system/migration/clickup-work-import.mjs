@@ -240,7 +240,7 @@ function updateRowsFromComments(product, taskComments) {
   return rows
 }
 
-async function importProduct(product, { productByExternal, timeByTask }) {
+async function importProduct(product, { productByExternal, timeByTask, spaceNameMap }) {
   const task = await cu(`/task/${product.external_id}?include_subtasks=false`)
   if (!task) return { failed: true }
 
@@ -250,6 +250,10 @@ async function importProduct(product, { productByExternal, timeByTask }) {
     clickup_url: task.url || null,
     clickup_list_id: task.list?.id || product.clickup_list_id || null,
     clickup_list_name: task.list?.name || product.clickup_list_name || null,
+    clickup_folder_id: (task.folder && !task.folder.hidden) ? String(task.folder.id) : null,
+    clickup_folder_name: (task.folder && !task.folder.hidden) ? task.folder.name : null,
+    clickup_space_id: task.space?.id ? String(task.space.id) : null,
+    clickup_space_name: spaceNameMap?.get(String(task.space?.id)) || null,
     clickup_parent_id: task.parent || null,
     clickup_top_level_parent_id: task.top_level_parent || null,
     clickup_status: task.status?.status || null,
@@ -261,6 +265,10 @@ async function importProduct(product, { productByExternal, timeByTask }) {
     clickup_closed_at: msToIso(task.date_closed),
     clickup_start_at: msToIso(task.start_date),
     clickup_due_at: msToIso(task.due_date),
+    clickup_creator_id: String(task.creator?.id ?? '') || null,
+    clickup_creator_name: task.creator?.username ?? null,
+    clickup_time_estimate_ms: task.time_estimate ?? null,
+    clickup_orderindex: task.orderindex ?? null,
     clickup_raw: task,
   })
 
@@ -374,6 +382,15 @@ async function fetchProducts() {
   return rows.slice(0, LIMIT)
 }
 
+async function buildSpaceNameMap() {
+  const map = new Map()
+  try {
+    const spaces = (await cu(`/team/${WORKSPACE}/space?archived=false`))?.spaces || []
+    for (const s of spaces) map.set(String(s.id), s.name)
+  } catch { /* best effort */ }
+  return map
+}
+
 async function fetchTimeEntries() {
   const now = Date.now()
   const start = now - TIME_DAYS * 86400000
@@ -401,12 +418,14 @@ async function run() {
   const products = await fetchProducts()
   const productByExternal = new Map(products.map((p) => [String(p.external_id), p]))
   const timeByTask = await fetchTimeEntries()
+  const spaceNameMap = await buildSpaceNameMap()
+  console.log(`[${new Date().toISOString()}] space-name map ${spaceNameMap.size}`)
   const c = loadCheckpoint()
   console.log(`[${new Date().toISOString()}] products ${products.length}; start index ${c.index}`)
   for (; c.index < products.length; c.index++) {
     await login()
     try {
-      const result = await importProduct(products[c.index], { productByExternal, timeByTask })
+      const result = await importProduct(products[c.index], { productByExternal, timeByTask, spaceNameMap })
       if (result.failed) c.failed++
       else {
         c.files += result.files

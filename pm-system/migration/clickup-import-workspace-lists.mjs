@@ -179,10 +179,10 @@ async function workspaceLists() {
   for (const space of spaces) {
     const folders = (await cu(`/space/${space.id}/folder?archived=false`)).folders || []
     for (const folder of folders) {
-      for (const list of folder.lists || []) lists.push({ id: String(list.id), name: list.name, space: space.name, folder: folder.name })
+      for (const list of folder.lists || []) lists.push({ id: String(list.id), name: list.name, space: space.name, spaceId: String(space.id), folder: folder.name, folderId: String(folder.id) })
     }
     const folderless = (await cu(`/space/${space.id}/list?archived=false`)).lists || []
-    for (const list of folderless) lists.push({ id: String(list.id), name: list.name, space: space.name, folder: null })
+    for (const list of folderless) lists.push({ id: String(list.id), name: list.name, space: space.name, spaceId: String(space.id), folder: null, folderId: null })
   }
   return lists.filter((list) => !ONLY_LISTS.size || ONLY_LISTS.has(list.id))
 }
@@ -215,6 +215,10 @@ function payload(task, list, stage) {
     clickup_url: task.url || null,
     clickup_list_id: task.list?.id || list.id,
     clickup_list_name: task.list?.name || list.name,
+    clickup_folder_id: list.folderId,
+    clickup_folder_name: list.folder,
+    clickup_space_id: list.spaceId,
+    clickup_space_name: list.space,
     clickup_parent_id: task.parent || null,
     clickup_top_level_parent_id: task.top_level_parent || null,
     clickup_status: task.status?.status || null,
@@ -226,6 +230,10 @@ function payload(task, list, stage) {
     clickup_closed_at: msToIso(task.date_closed),
     clickup_start_at: msToIso(task.start_date),
     clickup_due_at: msToIso(task.due_date),
+    clickup_creator_id: String(task.creator?.id ?? '') || null,
+    clickup_creator_name: task.creator?.username ?? null,
+    clickup_time_estimate_ms: task.time_estimate ?? null,
+    clickup_orderindex: task.orderindex ?? null,
     clickup_raw: task,
   }
 }
