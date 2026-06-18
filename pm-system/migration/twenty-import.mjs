@@ -112,8 +112,11 @@ async function run() {
   console.log(`Twenty -> Directus CRM import (${DRY ? 'DRY' : 'LIVE'})`)
 
   const maps = {
-    retailer: await preload('retailer'),
-    buyer: await preload('buyer'),
+    // Full Twenty-CRM company/contact sets import into the raw registries; the
+    // promote_customer trigger copies any customer_status=ACTIVE/POTENTIAL company
+    // into the curated `retailer` table. See migration/split-customers-from-ingested.sql.
+    ingested_domains: await preload('ingested_domains'),
+    ingested_contact: await preload('ingested_contact'),
     factory: await preload('factory'),
     crm_department: await preload('crm_department'),
     crm_opportunity: await preload('crm_opportunity'),
@@ -147,7 +150,7 @@ async function run() {
       external_id: company.id,
       external_source: 'twenty',
     })
-    companyIdToRetailer.set(company.id, await upsert('retailer', payload, maps, { matchName: company.name }))
+    companyIdToRetailer.set(company.id, await upsert('ingested_domains', payload, maps, { matchName: company.name }))
   }
   console.log(`  retailers/companies: ${companies.length}`)
 
@@ -192,7 +195,7 @@ async function run() {
       external_id: person.id,
       external_source: 'twenty',
     })
-    personIdToBuyer.set(person.id, await upsert('buyer', payload, maps, { matchEmail: person.emailsPrimaryEmail, matchName: fullName(person) }))
+    personIdToBuyer.set(person.id, await upsert('ingested_contact', payload, maps, { matchEmail: person.emailsPrimaryEmail, matchName: fullName(person) }))
   }
   console.log(`  buyers/contacts: ${people.length}`)
 

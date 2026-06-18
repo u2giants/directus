@@ -780,8 +780,11 @@ async function reroute() {
 }
 
 async function ensureRetailerForDomain(domain) {
+  // Newly-ingested domains are not customers — they land in the raw ingested_domains
+  // registry (dedup source). Real customers reach the curated `retailer` table only via
+  // promotion (the promote_customer trigger copies them when customer_status is set).
   const candidates = domainCandidates(domain)
-  const existing = await queryItems('retailer', {
+  const existing = await queryItems('ingested_domains', {
     filter: {
       _or: candidates.flatMap((candidate) => [
         { domain: { _contains: candidate } },
@@ -792,7 +795,7 @@ async function ensureRetailerForDomain(domain) {
     limit: 2,
   })
   if (existing[0]) return existing[0].id
-  const row = await dx('POST', '/items/retailer', {
+  const row = await dx('POST', '/items/ingested_domains', {
     name: domainToCompanyName(domain),
     domain,
     customer_status: 'UNASSIGNED',
@@ -816,7 +819,7 @@ async function contactSync() {
     const domain = domainOf(address)
     if (!retailerByDomain.has(domain)) {
       const candidates = domainCandidates(domain)
-      const before = await queryItems('retailer', {
+      const before = await queryItems('ingested_domains', {
         filter: {
           _or: candidates.flatMap((candidate) => [
             { domain: { _contains: candidate } },
@@ -830,9 +833,10 @@ async function contactSync() {
       if (!before.length) retailersCreated += 1
       retailerByDomain.set(domain, retailer)
     }
-    const existing = await queryItems('buyer', { filter: { email: { _eq: address } }, fields: ['id'], limit: 1 })
+    // Ingested contacts land in ingested_contact; real buyers are curated separately.
+    const existing = await queryItems('ingested_contact', { filter: { email: { _eq: address } }, fields: ['id'], limit: 1 })
     if (existing.length) continue
-    await dx('POST', '/items/buyer', {
+    await dx('POST', '/items/ingested_contact', {
       name: personNameFromEmail(address),
       email: address,
       retailer: retailerByDomain.get(domain),
@@ -843,7 +847,7 @@ async function contactSync() {
     })
     buyersCreated += 1
   }
-  console.log(`contact-sync: ${retailersCreated} retailers created, ${buyersCreated} contacts created, ${addresses.length} addresses evaluated`)
+  console.log(`contact-sync: ${retailersCreated} ingested domains created, ${buyersCreated} ingested contacts created, ${addresses.length} addresses evaluated`)
 }
 
 async function summarize() {

@@ -1,8 +1,40 @@
 # HANDOFF — Split customer data out of the ingested CRM dump
 
-**Status:** planned, not started (authored 2026-06-18). No schema/code changes made yet.
+**Status:** APPLIED to prod 2026-06-18 (Phases 0–3). Phase 4 (`popcrm-web`) outstanding.
 **Owner decision:** physical-split (rejected read-only views and flag-only filtering).
-**Scope:** `directus` backend (schema + `crm-worker.mjs`), with one-line follow-ups in `poppim-web` and screen changes in `popcrm-web`.
+**Scope:** `directus` backend (schema + `crm-worker.mjs` + `twenty-import.mjs`), `poppim-web` (done), `popcrm-web` (todo).
+
+## What was applied (2026-06-18)
+
+- **Migration** `pm-system/migration/split-customers-from-ingested.sql` ran on prod (inside one
+  transaction; dry-run/ROLLBACK verified first). Full backup taken to
+  `pm-system/backups/directus-pre-20260618-customer-split.sql` (gitignored, 2.8 GB).
+- Tables now: `ingested_domains` 3,740 · `retailer` 102 · `ingested_contact` 8,649 · `buyer` 747.
+- PIM FKs → curated tables; `crm_*` FKs → ingested tables; Directus metadata
+  (collections/fields/relations) updated; 2 owner self-reference orphans nulled.
+- **Copy-on-promotion trigger** `promote_customer` on `ingested_domains`: setting
+  `customer_status` to ACTIVE/POTENTIAL copies the row (same id) into `retailer`
+  (ON CONFLICT DO NOTHING; never auto-removes). Smoke-tested.
+- **`crm-worker.mjs`** contact-sync now reads/writes `ingested_domains`/`ingested_contact`
+  (routing reads unchanged — they match against curated `retailer`, ids resolve in both).
+- **`twenty-import.mjs`** upserts the full company/contact sets into `ingested_*`; the trigger
+  promotes customers. `companyIdToRetailer`/`personIdToBuyer` now hold ingested ids (correct
+  for the `crm_*` relations).
+- **`poppim-web`** `fetchCustomers()` reads the clean `retailer` directly (filter removed); deployed separately.
+- Directus app container restarted to refresh the schema cache.
+
+### Still TODO
+
+- **Phase 4 — `popcrm-web`** (separate repo): point company/contact list screens at
+  `ingested_domains`/`ingested_contact` (full) vs `retailer`/`buyer` (curated). The `ingested_*`
+  collections have **no directus_permissions yet** (admin/worker only) — add policies there if
+  the CRM app must read them.
+- **`crm-schema.mjs`** still targets `retailer`/`buyer`. If you add CRM company/contact fields
+  later, also add them to `ingested_domains`/`ingested_contact` (or retarget crm-schema), since
+  the dumps are now the company/contact masters.
+- Real **buyers** are not auto-promoted (only domains are). Add real buyers to the curated
+  `buyer` table directly (it's editable) or reference them from PIM work; ingested email
+  contacts intentionally stay out.
 
 ## Why
 

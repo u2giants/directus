@@ -8,3 +8,4 @@ backups/
 
 # Playwright MCP scratch
 .playwright-mcp/
+pm-system/backups/
