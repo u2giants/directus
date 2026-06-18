@@ -1,6 +1,6 @@
 # HANDOFF — Split customer data out of the ingested CRM dump
 
-**Status:** APPLIED to prod 2026-06-18 (Phases 0–3). Phase 4 (`popcrm-web`) outstanding.
+**Status:** COMPLETE — applied to prod 2026-06-18 (Phases 0–4).
 **Owner decision:** physical-split (rejected read-only views and flag-only filtering).
 **Scope:** `directus` backend (schema + `crm-worker.mjs` + `twenty-import.mjs`), `poppim-web` (done), `popcrm-web` (todo).
 
@@ -23,12 +23,17 @@
 - **`poppim-web`** `fetchCustomers()` reads the clean `retailer` directly (filter removed); deployed separately.
 - Directus app container restarted to refresh the schema cache.
 
+### Phase 4 — `popcrm-web` (done 2026-06-18, commit a020eba)
+
+The CRM is the triage/curation surface, so its company/contact reads + writes target the FULL
+ingested registries. `features/crm/api.ts`: `fetchRetailers`/`updateRetailer` →
+`ingested_domains`, `fetchBuyers`/`updateBuyer` → `ingested_contact`; `Schema` type extended.
+Nested `crm_*` expansions already resolve to the ingested tables via the repointed relations.
+Mirrored `directus_permissions`: copied every `retailer`→`ingested_domains` (11 rows) and
+`buyer`→`ingested_contact` (15 rows) policy grant, then restarted Directus.
+
 ### Still TODO
 
-- **Phase 4 — `popcrm-web`** (separate repo): point company/contact list screens at
-  `ingested_domains`/`ingested_contact` (full) vs `retailer`/`buyer` (curated). The `ingested_*`
-  collections have **no directus_permissions yet** (admin/worker only) — add policies there if
-  the CRM app must read them.
 - **`crm-schema.mjs`** still targets `retailer`/`buyer`. If you add CRM company/contact fields
   later, also add them to `ingested_domains`/`ingested_contact` (or retarget crm-schema), since
   the dumps are now the company/contact masters.
