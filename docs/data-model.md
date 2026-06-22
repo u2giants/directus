@@ -324,6 +324,61 @@ These fields exist on `product`, `project`, `design`, and `design_collection`. T
 | is_default | boolean | default for the owner scope |
 | shared_with_role | M2O → directus_roles | optional shared role visibility |
 
+**`pm_dependency`** — cross-item dependencies, blockers, and related-work links
+| field | type | notes |
+|---|---|---|
+| product | M2O → product | product this dependency is tracked from |
+| depends_on_product | M2O → product | product this item depends on or relates to |
+| project | M2O → project | project/offer context |
+| title | string | short dependency title |
+| dependency_type | enum | blocked_by \| blocks \| related \| duplicate \| parent_child |
+| status | enum | open \| waiting \| resolved \| canceled |
+| waiting_on | string | person/team/vendor/licensor/buyer blocking progress |
+| due_at / resolved_at | timestamp | expected unblock/follow-up date and resolution date |
+| notes | text/rich | dependency notes |
+| source_system / source_id | string | optional external provenance |
+
+**`pm_decision`** — structured decision and approval records
+| field | type | notes |
+|---|---|---|
+| product | M2O → product | product context |
+| project | M2O → project | project/offer context |
+| object_collection / object_id | string | generic target seam for non-product decisions |
+| decision_type | enum | approved \| rejected \| changes_requested \| parked \| canceled \| reusable \| buyer_picked \| buyer_passed \| licensor_approved \| sample_approved \| order_received \| custom |
+| status | enum | proposed \| decided \| superseded \| canceled |
+| decided_by | M2O → directus_users | user who made or recorded the decision |
+| decided_at | timestamp | decision time |
+| reason / notes | text / text-rich | short rationale and detailed evidence |
+| evidence_url | string | proof/portal/source URL |
+| source_system / source_id | string | optional external provenance |
+
+**`pm_reminder`** — in-app follow-up reminders and due operational nudges
+| field | type | notes |
+|---|---|---|
+| product | M2O → product | product context |
+| project | M2O → project | project/offer context |
+| object_collection / object_id | string | generic target seam |
+| title | string | reminder title |
+| due_at | timestamp | reminder due date/time |
+| assigned_to | M2O → directus_users | user responsible for the follow-up |
+| status | enum | open \| snoozed \| done \| canceled |
+| reminder_type | enum | follow_up \| licensor_response \| buyer_response \| sample_due \| factory_due \| missing_evidence \| stage_sla \| custom |
+| snoozed_until / completed_at | timestamp | reminder lifecycle dates |
+| notes | text/rich | reminder notes |
+
+**`pm_workflow_template`** — reusable checklist, evidence, and stage-gate templates
+| field | type | notes |
+|---|---|---|
+| name | string | template name |
+| business_unit | enum | All \| POP Creations \| Spruce Line \| Software |
+| object_type | enum | product \| project \| submission \| sample \| revision |
+| template_type | enum | checklist \| stage_gate \| project \| submission \| sample |
+| active | boolean | whether the template is available |
+| description | text | template description |
+| checklist_json / required_evidence_json | json | reusable checklist and evidence requirements |
+| default_next_action | text | optional next-action text when applying |
+| default_owner_role | M2O → directus_roles | role/team that usually owns the next action |
+
 ### 3.2.2 Workflow model migration status
 
 What changed:
@@ -334,6 +389,17 @@ The imported ClickUp/D1 evidence had repeated task activity, but the custom PM f
 
 Future sessions should:
 Treat the backfill as an evidence-derived baseline, not as a full historical recreation of every repeated ClickUp event. Backfilled child rows use `external_source='workflow_backfill_v1'` and stable `external_id` values for dedupe; dry-run the script first and use `APPLY=1` only when intentionally writing.
+
+### 3.2.3 Operating model migration status
+
+What changed:
+The PM operating-record layer above was applied to production on 2026-06-22 by `pm-system/add-operating-model.mjs`. It is additive/idempotent and grants app-role permissions for `pm_dependency`, `pm_decision`, `pm_reminder`, and `pm_workflow_template`.
+
+Why:
+The `poppim-web` frontend now has first-class, durable records for blockers/dependencies, decisions/approvals, in-app reminders, and reusable workflow/evidence/checklist templates.
+
+Future sessions should:
+Extend `pm-system/add-operating-model.mjs` additively for this layer and update this doc plus the frontend `src/lib/types.ts` / `src/features/operating/api.ts`. `pm_reminder` is only the durable reminder record; external notification delivery still needs a future Flow or worker.
 
 ### 3.3 Automation / ledger collections
 

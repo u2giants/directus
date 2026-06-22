@@ -27,7 +27,7 @@ Always start with **`AGENTS.md`**. Then load only what the task needs:
 | Understand what ClickUp monitoring proved | `docs/product-flow-evidence-pack.md`, `BUSINESS_INTELLIGENCE.md`, live D1 when needed | implementation docs unless changing schema |
 | Why Directus (vs Plane/Twenty) | `docs/platform-decision-report.md`, `docs/plane-free-edition-gaps.md` | — |
 | Build/extend the PM system | `AGENTS.md`, `docs/data-model.md`, `docs/pm-system-design.md`, `pm-system/README.md` | legacy analytics docs |
-| Change the Directus schema / Flows / roles | `docs/data-model.md`, `pm-system/apply-schema.mjs`; for the workflow/lifecycle add-on also read `pm-system/add-workflow-model.mjs` | deployment docs unless infra changes |
+| Change the Directus schema / Flows / roles | `docs/data-model.md`, `pm-system/apply-schema.mjs`; for the workflow/lifecycle add-on also read `pm-system/add-workflow-model.mjs`; for PM dependencies/decisions/reminders/templates also read `pm-system/add-operating-model.mjs` | deployment docs unless infra changes |
 | Deploy / domain / env / runtime config | `AGENTS.md` §13, `docs/deployment.md` (legacy worker), `pm-system/docker-compose.yml` | — |
 | Migration import (ClickUp → Directus) | `docs/data-model.md` §7, `BUSINESS_INTELLIGENCE.md`, `docs/legacy/*` (when archived) | — |
 | Work on the legacy worker | `integrations/worker/README.md`, `BUSINESS_INTELLIGENCE.md` | PM docs |
@@ -167,6 +167,16 @@ The frontend now depends on business-specific workflow records, lifecycle queues
 Future sessions should:
 Use `pm-system/add-workflow-model.mjs` as the reference for this layer and keep `docs/data-model.md` in sync. Vendor still has no workflow collection access; do not grant vendor product/order/workflow access until per-vendor row scoping exists.
 
+### PM operating model was added as a second additive layer
+What changed:
+`pm-system/add-operating-model.mjs` was applied to production on 2026-06-22. It added `pm_dependency`, `pm_decision`, `pm_reminder`, and `pm_workflow_template` with app-role permissions; the `poppim-web` frontend now uses them for product Operations, My Work reminders, Settings templates, and Reports operating metrics.
+
+Why:
+The PM frontend needed durable blockers/dependencies, approval/decision records, in-app follow-up reminders, and reusable workflow/evidence/checklist templates without mutating the original baseline schema in a destructive way.
+
+Future sessions should:
+Use `pm-system/add-operating-model.mjs` as the reference for this layer and keep `docs/data-model.md` in sync. It creates collections with `schema: {}` and is idempotent; extend it additively instead of hand-editing production tables. External notification delivery is not implemented here yet; `pm_reminder` is the durable record that a future Flow/worker can deliver from.
+
 ### Workflow backfill is idempotent but already applied
 What changed:
 `pm-system/migration/backfill-workflow-model.mjs` backfilled production on 2026-06-14: 16,534 products received lifecycle fields, plus 84 `product_submission`, 5 `product_sample`, and 610 `revision_request` rows. Backfilled child rows use `external_source='workflow_backfill_v1'` and stable `external_id` values for dedupe.
@@ -209,13 +219,13 @@ For broad parity checks, compare live ClickUp task ids against the union of `pro
 
 ### Product-file attachments are stored in Spaces, with a dead-source tail
 What changed:
-`pm-system/migration/clickup-files-to-spaces.mjs` copies imported `product_file.source_url` attachments from ClickUp into DigitalOcean Spaces as unchanged originals under `product-files/<product>/<file>.<ext>` and creates image thumbnails under `product-files/<product>/<file>_thumb.webp`. After the 2026-06-14 pass, Directus had 20,281 `product_file` rows, 20,234 stored in Spaces, and 47 remaining unstored source URLs.
+`pm-system/migration/clickup-files-to-spaces.mjs` copies imported `product_file.source_url` attachments from ClickUp into DigitalOcean Spaces as unchanged originals under `product-files/<product>/<file>.<ext>` and creates image thumbnails under `product-files/<product>/<file>_thumb.webp`. After a 2026-06-21 extension-parser fix and rerun, Directus had 20,281 `product_file` rows, 20,235 stored in Spaces, and 46 remaining unstored source URLs.
 
 Why:
 ClickUp attachment URLs are not durable storage. The PM frontend now prefers `thumbnail_url`/`stored_url`, but some old ClickUp attachment URLs return 404 or 200 with zero bytes even with the ClickUp token, so those source bytes cannot be copied from the current URL.
 
 Future sessions should:
-Treat the 47 unstored rows as source-byte recovery work, not missing database rows. Verify by probing `product_file.source_url` anonymously and with `CLICKUP_TOKEN`; if ClickUp still returns 0 bytes/404, recover from another source (old export/NAS/user upload) rather than rerunning the same URL loop.
+Treat the 46 unstored rows as source-byte recovery work, not missing database rows. Verify by probing `product_file.source_url` anonymously and with `CLICKUP_TOKEN`; if ClickUp still returns 0 bytes/404, recover from another source (old export/NAS/user upload) rather than rerunning the same URL loop.
 
 ### Designflow PLM is the customer/licensor master (one-way sync into Directus)
 

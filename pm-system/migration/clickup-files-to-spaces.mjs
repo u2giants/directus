@@ -104,7 +104,7 @@ function extFrom(contentType, url, fileType) {
   const ct = (contentType || '').split(';')[0].trim().toLowerCase()
   if (EXT_BY_TYPE[ct]) return EXT_BY_TYPE[ct]
   const ft = (fileType || '').toLowerCase().replace(/^\./, '')
-  if (ft) return ft.replace('jpeg', 'jpg')
+  if (/^[a-z0-9]{1,8}$/.test(ft)) return ft.replace('jpeg', 'jpg')
   const m = (url || '').split('?')[0].match(/\.([a-z0-9]{2,8})$/i)
   return m?.[1]?.toLowerCase().replace('jpeg', 'jpg') || 'bin'
 }

@@ -391,15 +391,26 @@ async function buildSpaceNameMap() {
   return map
 }
 
+async function fetchWorkspaceAssignees() {
+  const teams = (await cu('/team'))?.teams || []
+  const team = teams.find((t) => String(t.id) === String(WORKSPACE))
+  return (team?.members || []).map((m) => m.user?.id).filter(Boolean)
+}
+
 async function fetchTimeEntries() {
   const now = Date.now()
   const start = now - TIME_DAYS * 86400000
+  const assignees = await fetchWorkspaceAssignees()
   const entries = []
-  for (let page = 0;; page++) {
-    const data = await cu(`/team/${WORKSPACE}/time_entries?start_date=${start}&end_date=${now}&page=${page}`)
-    const batch = data?.data || []
-    entries.push(...batch)
-    if (batch.length < 100) break
+  const chunks = assignees.length ? [assignees.join(',')] : ['']
+  for (const assignee of chunks) {
+    const assigneeParam = assignee ? `&assignee=${encodeURIComponent(assignee)}` : ''
+    for (let page = 0;; page++) {
+      const data = await cu(`/team/${WORKSPACE}/time_entries?start_date=${start}&end_date=${now}${assigneeParam}&include_task_tags=true&include_location_names=true&page=${page}`)
+      const batch = data?.data || []
+      entries.push(...batch)
+      if (batch.length < 100) break
+    }
   }
   const byTask = new Map()
   for (const entry of entries) {
