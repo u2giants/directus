@@ -400,11 +400,14 @@ The following operations require manual steps and have no automated workflow:
 
 ---
 
-## POP CRM host workers
+## Legacy POP CRM host workers
 
 What changed:
-POP CRM's host-side maintenance jobs now run the Supabase worker at
-`pm-system/crm-worker-supabase.mjs`. The installed units are:
+POP CRM's host-side maintenance jobs no longer run from this repo. Active worker
+ownership moved to `/worksp/popcrm-web` on 2026-06-26, and active PLM
+master-data import moved to `/worksp/shared-db`.
+
+Historical units once installed from this repo were:
 
 - `popcrm-contact-sync.service`
 - `popcrm-summarize.service`
@@ -417,9 +420,7 @@ collections. The contact sync must record unknown domains in
 email-domain noise into `core.customer`.
 
 Future sessions should:
-Keep `/home/ai/.crm-worker.env` out of git. It must include `SUPABASE_URL` and
-`SUPABASE_SERVICE_ROLE_KEY` for the shared POP Supabase project. After changing
-unit files, run `sudo systemctl daemon-reload` and verify with
-`systemctl cat popcrm-contact-sync.service`. After changing the worker, run
-`node --check pm-system/crm-worker-supabase.mjs` and a one-shot
-`sudo systemctl start popcrm-contact-sync.service`.
+Use `/worksp/popcrm-web/systemd/` and
+`/worksp/popcrm-web/workers/crm-worker-supabase.mjs` for CRM worker changes. Use
+`/worksp/shared-db/systemd/` and `/worksp/shared-db/tools/` for PLM master-data
+sync. Do not install active host units that reference `/worksp/directus`.

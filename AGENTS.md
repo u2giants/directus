@@ -1,6 +1,14 @@
 # AGENTS.md
 
-Canonical operating guide for the **directus** repo — the **shared backend for the POP super-app** (PIM + CRM now; DAM later, all on one Directus instance + one Postgres). Read this first; it routes you to everything else.
+Canonical operating guide for the **directus** repo — the legacy Directus backend.
+Read this first; it routes you to everything else.
+
+> **Legacy status (2026-06-26):** current POP CRM, PM/PIM, DAM, PLM master-data
+> import, CRM Outlook/contact maintenance, CRM Fireflies, and shared Supabase
+> schema work do **not** depend on `/worksp/directus`. The active shared backend
+> source of truth is Supabase.com, with canonical schema/docs in
+> `/worksp/shared-db`. CRM host workers live in `/worksp/popcrm-web`; PLM
+> master-data import lives in `/worksp/shared-db`.
 
 > **Renamed 2026-06-10:** repo `poppim`→`directus`, Coolify service/containers `poppim-*`→`directus-*`, volumes `poppim-*`→`directus-*`, folder `/worksp/poppim`→`/worksp/directus`, URL `pm.designflow.app`→**`data.designflow.app`**, secrets file `~/.poppim-deploy.env`→`~/.directus-deploy.env`. The three app **frontends** are separate repos/containers (`poppim-web`, `popcmr-web`, `popdam-web`); this repo is the backend only.
 >
@@ -64,8 +72,8 @@ Our custom code lives here:
 | (none in third-party code) | Directus is a stock image; no upstream fork | — | — |
 | Coolify DB `service_applications.id=16` `fqdn` | Set to `https://data.designflow.app:8055` directly in Coolify's Postgres | Coolify's public API has no endpoint to set a **service sub-app** custom domain; the field the UI edits had to be set in the datastore (see §11) | If the service is recreated from scratch, re-apply; check the Traefik `Host()` label |
 | Coolify DB stale rename rows (`service_applications.id=15`, `service_databases.id=3`) | Set `exclude_from_status=true` on old `poppim-app` / `poppim-db` rows | Coolify counted the exited pre-rename rows in the Directus service rollup, showing `degraded (unhealthy)` even while `directus-app`/`directus-db` and `/server/health` were OK | If the service is recreated, verify old sub-service rows are not included in status |
-| Host systemd timer `plm-sync.timer` (runs as `ai`, daily 03:30) | Runs `pm-system/run-plm-sync.sh` → `pm-system/sync-plm-masters.mjs` on this VPS — NOT in Coolify | One-way Designflow-PLM → Directus master-data sync (customers/licensors/properties/characters). Host-side so it reaches Postgres directly (`pg` is a host dep of this repo); secrets in mode-600 `/home/ai/.plm-sync.env` (see §11 PLM link) | If the host is rebuilt, re-create the unit + timer + env file (units under `/etc/systemd/system/plm-sync.*`, repo copies in `pm-system/systemd/`); `npm i` to restore `pg` |
-| Host CRM Supabase worker units | `popcrm-contact-sync.service`, `popcrm-summarize.service`, and `popcrm-apply-ignore-rules.service` run `pm-system/crm-worker-supabase.mjs` with secrets in mode-600 `/home/ai/.crm-worker.env` | CRM data moved from Directus collections to the shared Supabase backend; the host timers still own Outlook/contact maintenance jobs | If the host is rebuilt, install the unit files from `pm-system/systemd/`, restore `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, run `npm install`, and verify `systemctl cat popcrm-contact-sync.service` points to `crm-worker-supabase.mjs` |
+| Host systemd timer `plm-sync.timer` | **Moved out:** active unit templates live in `/worksp/shared-db/systemd/` and run `/worksp/shared-db/tools/run-plm-master-data-sync.sh` | PLM master data imports into Supabase via `plm.import_master_data(...)`; this repo's old Directus DB sync is legacy only | Do not re-point active host units at this repo |
+| Host CRM worker units | **Moved out:** active units live in `/worksp/popcrm-web/systemd/` and run `/worksp/popcrm-web/workers/crm-worker-supabase.mjs` | CRM data lives in shared Supabase; Directus is not required for Outlook/contact/summarize/Fireflies runtime | Do not re-point active host units at this repo |
 
 ## 7. Task-to-file navigation
 
@@ -181,11 +189,11 @@ Use `pm-system/add-operating-model.mjs` as the reference for this layer and keep
 ### CRM Supabase worker records unknown domains as triage rows
 
 What changed:
-On 2026-06-26, the host-side CRM worker moved from the old Directus collection
-contract to `pm-system/crm-worker-supabase.mjs` for contact sync, summaries, and
-ignore-rule application. It uses the shared Supabase service-role key from
-`/home/ai/.crm-worker.env`; Node 20 requires the `ws` package to be passed as
-the Supabase realtime transport.
+On 2026-06-26, the host-side CRM worker moved from this repo to
+`/worksp/popcrm-web/workers/crm-worker-supabase.mjs` for Outlook ingest, reroute,
+Fireflies, contact sync, summaries, and ignore-rule application. It uses the
+shared Supabase service-role key from `/home/ai/.crm-worker.env`; Node 20
+requires the `ws` package to be passed as the Supabase realtime transport.
 
 Why:
 POP CRM Accounts Triage now reads `crm.ingested_domain` through
@@ -198,7 +206,7 @@ When adding CRM ingestion behavior, call
 `crm.record_ingested_domain(p_domain, p_sender, p_subject, p_display_name)` for
 unknown non-noise domains. Only human promotion through
 `crm.promote_ingested_domain(...)` should create a potential `core.customer`.
-Do not switch the systemd units back to `crm-worker.mjs` unless deliberately
+Do not switch systemd units or containers back to this repo unless deliberately
 rolling back the Supabase CRM cutover.
 
 ### Workflow backfill is idempotent but already applied
