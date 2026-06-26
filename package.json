@@ -7,6 +7,8 @@
     "doc": "docs"
   },
   "scripts": {
+    "supabase:audit": "node pm-system/migration/supabase-readiness-audit.mjs",
+    "supabase:dump": "bash pm-system/migration/create-supabase-dump.sh",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -22,7 +24,9 @@
   },
   "homepage": "https://github.com/u2giants/directus#readme",
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
     "pg": "^8.22.0",
-    "sharp": "^0.35.1"
+    "sharp": "^0.35.1",
+    "ws": "^8.21.0"
   }
 }

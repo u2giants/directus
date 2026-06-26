@@ -1,5 +1,5 @@
 [Unit]
-Description=POP CRM contact sync from Directus email messages
+Description=POP CRM contact sync from Supabase email messages
 Wants=network-online.target
 After=network-online.target
 
@@ -8,4 +8,4 @@ Type=oneshot
 User=ai
 WorkingDirectory=/worksp/directus
 EnvironmentFile=/home/ai/.crm-worker.env
-ExecStart=/usr/bin/node /worksp/directus/pm-system/crm-worker.mjs contact-sync
+ExecStart=/usr/bin/node /worksp/directus/pm-system/crm-worker-supabase.mjs contact-sync

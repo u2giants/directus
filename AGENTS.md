@@ -65,6 +65,7 @@ Our custom code lives here:
 | Coolify DB `service_applications.id=16` `fqdn` | Set to `https://data.designflow.app:8055` directly in Coolify's Postgres | Coolify's public API has no endpoint to set a **service sub-app** custom domain; the field the UI edits had to be set in the datastore (see §11) | If the service is recreated from scratch, re-apply; check the Traefik `Host()` label |
 | Coolify DB stale rename rows (`service_applications.id=15`, `service_databases.id=3`) | Set `exclude_from_status=true` on old `poppim-app` / `poppim-db` rows | Coolify counted the exited pre-rename rows in the Directus service rollup, showing `degraded (unhealthy)` even while `directus-app`/`directus-db` and `/server/health` were OK | If the service is recreated, verify old sub-service rows are not included in status |
 | Host systemd timer `plm-sync.timer` (runs as `ai`, daily 03:30) | Runs `pm-system/run-plm-sync.sh` → `pm-system/sync-plm-masters.mjs` on this VPS — NOT in Coolify | One-way Designflow-PLM → Directus master-data sync (customers/licensors/properties/characters). Host-side so it reaches Postgres directly (`pg` is a host dep of this repo); secrets in mode-600 `/home/ai/.plm-sync.env` (see §11 PLM link) | If the host is rebuilt, re-create the unit + timer + env file (units under `/etc/systemd/system/plm-sync.*`, repo copies in `pm-system/systemd/`); `npm i` to restore `pg` |
+| Host CRM Supabase worker units | `popcrm-contact-sync.service`, `popcrm-summarize.service`, and `popcrm-apply-ignore-rules.service` run `pm-system/crm-worker-supabase.mjs` with secrets in mode-600 `/home/ai/.crm-worker.env` | CRM data moved from Directus collections to the shared Supabase backend; the host timers still own Outlook/contact maintenance jobs | If the host is rebuilt, install the unit files from `pm-system/systemd/`, restore `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, run `npm install`, and verify `systemctl cat popcrm-contact-sync.service` points to `crm-worker-supabase.mjs` |
 
 ## 7. Task-to-file navigation
 
@@ -176,6 +177,29 @@ The PM frontend needed durable blockers/dependencies, approval/decision records,
 
 Future sessions should:
 Use `pm-system/add-operating-model.mjs` as the reference for this layer and keep `docs/data-model.md` in sync. It creates collections with `schema: {}` and is idempotent; extend it additively instead of hand-editing production tables. External notification delivery is not implemented here yet; `pm_reminder` is the durable record that a future Flow/worker can deliver from.
+
+### CRM Supabase worker records unknown domains as triage rows
+
+What changed:
+On 2026-06-26, the host-side CRM worker moved from the old Directus collection
+contract to `pm-system/crm-worker-supabase.mjs` for contact sync, summaries, and
+ignore-rule application. It uses the shared Supabase service-role key from
+`/home/ai/.crm-worker.env`; Node 20 requires the `ws` package to be passed as
+the Supabase realtime transport.
+
+Why:
+POP CRM Accounts Triage now reads `crm.ingested_domain` through
+`api.crm_ingested_domain_list`. Email/Fireflies noise must not create
+`core.customer` rows that PM/PIM, DAM, or PLM might mistake for real shared
+customers.
+
+Future sessions should:
+When adding CRM ingestion behavior, call
+`crm.record_ingested_domain(p_domain, p_sender, p_subject, p_display_name)` for
+unknown non-noise domains. Only human promotion through
+`crm.promote_ingested_domain(...)` should create a potential `core.customer`.
+Do not switch the systemd units back to `crm-worker.mjs` unless deliberately
+rolling back the Supabase CRM cutover.
 
 ### Workflow backfill is idempotent but already applied
 What changed:

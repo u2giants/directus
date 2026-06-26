@@ -397,3 +397,29 @@ The following operations require manual steps and have no automated workflow:
    ```
 
 9. **Rotating secrets.** Generate new values externally, update via `gh secret set`, then redeploy the Worker (`gh workflow run deploy-worker.yml`) so the new secrets are pushed to Cloudflare.
+
+---
+
+## POP CRM host workers
+
+What changed:
+POP CRM's host-side maintenance jobs now run the Supabase worker at
+`pm-system/crm-worker-supabase.mjs`. The installed units are:
+
+- `popcrm-contact-sync.service`
+- `popcrm-summarize.service`
+- `popcrm-apply-ignore-rules.service`
+
+Why:
+CRM records now live in the shared Supabase backend instead of Directus
+collections. The contact sync must record unknown domains in
+`crm.ingested_domain` with `crm.record_ingested_domain(...)`; it must not insert
+email-domain noise into `core.customer`.
+
+Future sessions should:
+Keep `/home/ai/.crm-worker.env` out of git. It must include `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY` for the shared POP Supabase project. After changing
+unit files, run `sudo systemctl daemon-reload` and verify with
+`systemctl cat popcrm-contact-sync.service`. After changing the worker, run
+`node --check pm-system/crm-worker-supabase.mjs` and a one-shot
+`sudo systemctl start popcrm-contact-sync.service`.

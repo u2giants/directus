@@ -8,4 +8,4 @@ Type=oneshot
 User=ai
 WorkingDirectory=/worksp/directus
 EnvironmentFile=/home/ai/.crm-worker.env
-ExecStart=/usr/bin/node /worksp/directus/pm-system/crm-worker.mjs summarize
+ExecStart=/usr/bin/node /worksp/directus/pm-system/crm-worker-supabase.mjs summarize
