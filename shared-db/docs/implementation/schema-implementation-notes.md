@@ -2,16 +2,36 @@
 
 Date: 2026-06-21
 
-These migrations implement the first migration-ready version of the unified Supabase schema described in the mapping docs. They are intentionally DDL-only and have not been applied to the live Supabase project.
+These migrations implement the first migration-ready version of the unified Supabase schema described in the mapping docs. They are intentionally DDL-only; the production project also contains older PopDAM migration-history marker files so Supabase CLI can reconcile this repo with the existing production ledger.
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `supabase/migrations/20260621000100_foundation.sql` | Extensions, logical schemas, shared enums, timestamp trigger helper, and schema comments. |
-| `supabase/migrations/20260621000200_app_core.sql` | Shared app/profile/role tables, canonical `core` business objects, source-reference spines, SKU refs, and auth helper functions. |
-| `supabase/migrations/20260621000300_domain_tables.sql` | DAM, CRM, PIM/PM, PLM, ingest, and cross-domain bridge tables. |
-| `supabase/migrations/20260621000400_api_rls_realtime.sql` | Browser-facing `api` views, RLS scaffolding, grants, and selected realtime publication tables. |
+| `supabase/migrations/20260621150714_foundation.sql` | Extensions, logical schemas, shared enums, timestamp trigger helper, and schema comments. |
+| `supabase/migrations/20260621150815_app_core.sql` | Shared app/profile/role tables, canonical `core` business objects, source-reference spines, SKU refs, and auth helper functions. |
+| `supabase/migrations/20260621151024_domain_tables.sql` | DAM, CRM, PIM/PM, PLM, ingest, and cross-domain bridge tables. |
+| `supabase/migrations/20260621151155_api_rls_realtime.sql` | Browser-facing `api` views, RLS scaffolding, grants, and selected realtime publication tables. |
+| `supabase/migrations/20260622043000_crm_contact_segments.sql` | CRM Contacts segmented API: preserves `api.crm_contact_list`, adds `api.crm_contact_segment_list`, adds `api.crm_contact_segment_counts`, and indexes the primary contact-company relationship lookup. |
+| `supabase/migrations/20260624173000_plm_master_data_import.sql` | PLM master-data API import support: source-shaped `plm.*_import` tables, `plm.import_master_data(jsonb, jsonb)`, service-role execution grant, and admin-only RLS for import tables. |
+
+Related tooling:
+
+| File | Purpose |
+|---|---|
+| `tools/sync-plm-master-data.mjs` | Fetches the read-only Designflow PLM master-data API, reports response shape/counts, and can apply the payload to the linked Supabase project through `plm.import_master_data`. |
+
+## Production Migration History
+
+The production Supabase project started as a PopDAM project and already had a
+long migration history before `shared-db` became the canonical coordination repo.
+Supabase CLI requires every remote migration version to exist locally before it
+will run `supabase db push --dry-run`.
+
+For that reason, this repo includes no-op marker files for pre-shared-db PopDAM
+migrations. They intentionally contain comments only. Do not add schema logic to
+those marker files, and do not use `supabase migration repair` to hide them from
+the production ledger.
 
 ## What This Implements
 
@@ -32,12 +52,26 @@ These migrations implement the first migration-ready version of the unified Supa
   - `crm.opportunity_product`
   - `pim.customer_order.production_order_id`
 - Stable first-pass `api` views for frontend contracts.
+- CRM-specific contact segment contracts so popcrm-web can fetch customer,
+  department, and triage contacts separately while lazy-loading All.
+- PLM API master-data import support for canonical customers, licensors, and
+  properties:
+  - customers land in `core.company`
+  - licensors land in `core.licensor`
+  - properties land in `core.property`
+  - PLM source refs land in `core.company_source_ref` and
+    `core.taxonomy_source_ref`
+  - source-shaped PLM rows land in `plm.customer_import`,
+    `plm.licensor_import`, and `plm.property_import`
+  - sanitized raw API snapshots land in `ingest.raw_record`
 - RLS enabled across app/domain tables, with conservative policies.
 - Realtime publication candidates for user-facing movement, not worker/admin queues.
 
 ## What This Does Not Do Yet
 
-- It does not migrate data.
+- It does not migrate most historical app data. The exception is the PLM
+  canonical master-data API import for customers, licensors, and properties,
+  which was preview-validated and promoted to production on 2026-06-25.
 - It does not physically move existing PopDAM public tables.
 - It does not import Directus system metadata.
 - It does not migrate files from DigitalOcean Spaces or Directus storage.
