@@ -12,11 +12,11 @@ Read this first; it routes you to everything else.
 
 > **Renamed 2026-06-10:** repo `poppim`→`directus`, Coolify service/containers `poppim-*`→`directus-*`, volumes `poppim-*`→`directus-*`, folder `/worksp/poppim`→`/worksp/directus`, URL `pm.designflow.app`→**`data.designflow.app`**, secrets file `~/.poppim-deploy.env`→`~/.directus-deploy.env`. The three app **frontends** are separate repos/containers (`poppim-web`, `popcmr-web`, `popdam-web`); this repo is the backend only.
 >
-> **Domain plan (permanent):** humans use the app domains — `pm.designflow.app` (PM frontend), `crm.designflow.app` (CRM), `dam.designflow.app` (DAM). **`data.designflow.app` is the backend API only** (frontend→Directus calls; admins may use Data Studio there). `pm` currently still points at Directus (the only UI that exists); when `poppim-web` ships, `pm` moves to the frontend container. Frontends own **no data** — one shared Postgres behind Directus serves all three apps.
+> **Domain plan (current):** humans use the app domains — `pm.designflow.app` (PM frontend), `crm.designflow.app` (CRM), `dam.designflow.app` (DAM). **`data.designflow.app` is legacy Directus/Data Studio only.** Current PM/CRM/DAM/PLM runtime data lives in the shared Supabase backend documented in `/worksp/shared-db`; frontends must not use `/worksp/directus` for active Supabase-era behavior.
 
 ## 1. Project summary
 
-This repo runs the **shared Directus backend** (a headless data platform) that all three POP apps read/write: **PIM** (product/project management), **CRM**, and later **DAM**, sharing one database so their data interlinks. **live at https://data.designflow.app**. The PIM domain replaces ClickUp for two product lines — **POP Creations** (licensed home decor, 17-stage licensor pipeline) and **Spruce Line** (generic, 11-stage). The CRM domain replaced the Twenty fork on 2026-06-11. Non-technical staff may still use Directus **Data Studio**; dedicated React frontends serve the human app domains.
+This repo is the **legacy Directus backend/reference repo** at `https://data.designflow.app`. It previously hosted the shared PM/CRM Directus backend and remains useful for rollback/history, ClickUp import evidence, and old Directus schema/config context. It owns no current Supabase CRM, PM/PIM, DAM, PLM master-data, host-worker, systemd, timer, or shared-schema runtime.
 
 The repo also still contains the **legacy ClickUp analytics** — a live Cloudflare Worker (`plane-integrations`) + Python snapshot scripts that feed a D1 database and a natural-language query endpoint. This will be repurposed to feed the PM system's AI assistant from Directus webhooks; it is NOT the PM system itself.
 
@@ -259,19 +259,18 @@ ClickUp attachment URLs are not durable storage. The PM frontend now prefers `th
 Future sessions should:
 Treat the 46 unstored rows as source-byte recovery work, not missing database rows. Verify by probing `product_file.source_url` anonymously and with `CLICKUP_TOKEN`; if ClickUp still returns 0 bytes/404, recover from another source (old export/NAS/user upload) rather than rerunning the same URL loop.
 
-### Designflow PLM is the customer/licensor master (one-way sync into Directus)
+### Legacy Designflow PLM sync into Directus (superseded by shared-db)
 
 What changed:
-`pm-system/sync-plm-masters.mjs` (daily `plm-sync.timer`) pulls authoritative data from Designflow PLM into Directus: licensors/properties/characters (cross-ref `plm_mg_code`, unique within parent) and customers (table `retailer_plm_customer`, PK = PLM `customers_id`, → curated `retailer`). It is **create/link-only** — never renames, deletes, unlinks local rows, or downgrades status. PLM is authoritative but **not exhaustive**. See `docs/data-model.md` "PLM master-data link".
+The old `pm-system/sync-plm-masters.mjs` path pulled authoritative data from Designflow PLM into Directus. That Directus-targeted sync is legacy only. The active PLM master-data import now lives in `/worksp/shared-db`, with host units in `/worksp/shared-db/systemd/` and the wrapper `/worksp/shared-db/tools/run-plm-master-data-sync.sh`.
 
 Why:
-PLM syncs from the ERP, so it is the source of truth for who is a real customer and which licensors/properties exist. Tying Directus customer status to PLM keeps the app's customer list honest.
+PLM syncs from the ERP, so it remains the source of truth for real customers and licensor/property master data. Current production behavior imports those records into Supabase via `plm.import_master_data(...)`, not into Directus.
 
 Future sessions should:
 - Auth header is **`x-api-key`** with a long-lived `df_live_…` key — NOT `x-apy-key` (a typo the owner pasted once; it 403s) and no longer the old 30-day `X-User-Authorization` JWT. Endpoints: `…/item_master/lib/getLicensorsWithProperties`, `…/core/customers/getCustomers`.
-- The customer mapping is **many-to-one** (banners: TJX corp + HomeGoods → one `retailer`), so a scalar `plm_customer_id` won't do — keep the `retailer_plm_customer` table. PLM `customers_code` is NOT unique (e.g. `OS`); key on `customers_id`.
-- **First-time** links promote a POTENTIAL retailer to ACTIVE; re-runs never touch status. Owner overrides are pinned in the script's `CUST_LINK`/`CUST_CREATE`/`CUST_SKIP` maps (some PLM ACTIVE customers are kept POTENTIAL or skipped as out-of-business/dup/placeholder) — edit those maps, don't special-case in SQL.
-- Postgres bind params on `varchar` columns (`plm_mg_code`, `name`) need an explicit `::text` cast or you get `42P08 inconsistent types deduced` — the masters queries had this latent bug. Always test the script end-to-end (it's idempotent: a clean re-run reports all-zeros + 7 skipped).
+- Do not install or re-enable Directus-targeted PLM host units from this repo.
+- Make current PLM import/script/schema changes in `/worksp/shared-db`, following its branch + PR workflow.
 
 ## 12. Credentials and environment
 
@@ -286,7 +285,7 @@ All runtime secrets live in **Coolify** (service `nzli…` env). None are in the
 | `AUTH_MICROSOFT_CLIENT_ID/SECRET`, `MS_TENANT_ID` | Entra OIDC SSO | Coolify | — | yes |
 | `PUBLIC_URL` | `https://data.designflow.app` | Coolify | — | yes |
 | `GRAPH_TENANT_ID`, `GRAPH_SYNC_CLIENT_ID`, `GRAPH_SYNC_CLIENT_SECRET` | Entra role-sync write creds (Model B) — **retired 2026-06-21**, no longer used (safe to delete from the secrets file) | secrets file only (`/home/ai/.directus-deploy.env`) | — | no |
-| `PLM_API_KEY`, `DB_PASSWORD` | Designflow-PLM sync (`plm-sync.timer`) — PLM `x-api-key` + Postgres password | **secrets file only** (`/home/ai/.plm-sync.env`, mode 600); NOT in the repo. `DATABASE_URL` is built at runtime by `run-plm-sync.sh` (resolves the DB container IP) | — | yes (host timer) |
+| `PLM_API_KEY`, `SUPABASE_DB_URL` | Active Designflow-PLM sync (`plm-sync.timer`) — PLM `x-api-key` + Supabase database URL | **secrets file only** (`/home/ai/.plm-sync.env`, mode 600); active code and docs live in `/worksp/shared-db`, not this repo | — | yes (host timer) |
 
 Cloudflare DNS token and Coolify API token are operator credentials (in `CLAUDE.md` for Coolify); not app runtime config.
 
@@ -320,7 +319,7 @@ Deployed Directus + Postgres on Coolify at `data.designflow.app`. Two non-obviou
 | open | Postgres backups | Add scheduled `pg_dump` of `directus-db` + document retention |
 | partial | Phase-1.x data model | Workflow/lifecycle fields, submissions, samples, revisions, order enhancements, and saved-view collection are done (2026-06-14). Remaining: M2M relations (multi-buyer seam), remaining Flows (dormant/SLA), and role-specific default views/presets. |
 | superseded | Designflow PLM as the **role hub** | Dropped in favor of Entra-as-role-hub (Model B) — which is itself now **retired** (2026-06-21, see §11); role/auth moves to shared Supabase. (Distinct from the **master-data** sync below — that one is live.) |
-| done | Designflow PLM **master-data** sync (customers/licensors/properties/characters) | 2026-06-19: one-way PLM→Directus sync live via daily `plm-sync.timer`. Licensors/properties/characters cross-ref by `plm_mg_code`; 55 PLM customers reconciled (44 link + 3 create + 7 skip + HomeGoods→TJX) into `retailer_plm_customer`, 15 promoted to ACTIVE. PLM is the customer-status authority. See §11 "PLM master-data link" + `docs/data-model.md`. **Open follow-up:** real **buyers** still aren't synced from PLM (no buyer endpoint); add when available. |
+| moved | Designflow PLM **master-data** sync (customers/licensors/properties/characters) | Active runtime moved to `/worksp/shared-db` and imports into Supabase via daily `plm-sync.timer`. This repo's old Directus PLM scripts are historical only; do not point host units back here. |
 | open | Vendor role row-scoping | Vendor role has no product access yet; add per-vendor filter (user→factory/vendor map) so a vendor sees only their own products |
 | dropped | CRM/DAM read Entra groups | Never built; Entra role hub (Model B) **retired 2026-06-21** — role source moves to shared Supabase, not Entra groups |
 | open | Verify new-user notify Flow end-to-end | "New user role reminder" Flow is active but only fires on a real `provider=microsoft` sign-in; confirm on next real SSO signup |

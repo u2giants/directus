@@ -123,9 +123,9 @@ Notation: **PK** id is Directus's default UUID. Types are Directus field types. 
 
 *(Rationale for a `stage` collection rather than a plain select: it lets the two lines have different stage sets, attaches order/category/SLA context, and still drives a Kanban board by grouping `product` on `stage`. For the **first spike pass**, a simple single-select `stage` field on `product` is fine; promote to this collection when modeling both lines.)*
 
-### 3.1.1 Designflow PLM master-data link
+### 3.1.1 Legacy Designflow PLM master-data link
 
-Designflow PLM (ERP-synced) is the authoritative-but-not-exhaustive source for **customers, licensors, properties, and characters**. A one-way, create/link-only sync (`pm-system/sync-plm-masters.mjs`, daily `plm-sync.timer`) pulls them in. Schema lives in `pm-system/migration/plm-masters-schema.sql` + `plm-customers-schema.sql`. Auth + operational gotchas are in AGENTS.md §11 "PLM master-data link".
+Designflow PLM (ERP-synced) is the authoritative-but-not-exhaustive source for **customers, licensors, properties, and characters**. This section documents the old Directus-targeted model for historical reference only. The active PLM master-data import now lives in `/worksp/shared-db`, runs from `/worksp/shared-db/systemd/plm-sync.*`, and writes to Supabase through `plm.import_master_data(...)`. Do not point active host units or current PLM work back at `/worksp/directus`.
 
 **Licensor / property / character (3-tier `licensor → property → character`).** Cross-ref key is `plm_mg_code` (+ `plm_synced_at`) on each, **unique within its parent** (mg_code is NOT globally unique — e.g. `FR` is "1st Order Trooper" under SW and "Friends TV" under WB). `property.licensor` and `character.property` are NOT NULL + `ON DELETE CASCADE` (dependencies are strict). A few PLM top-level "licensors" are really brand **properties** and are reclassified down (`DC`/`FR`/`HP`→Warner Bros, `PP`→nick/VM); their PLM children become **characters**. The new tier-3 collection:
 
