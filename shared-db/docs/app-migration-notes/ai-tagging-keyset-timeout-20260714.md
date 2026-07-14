@@ -78,7 +78,7 @@ representative `EXPLAIN (ANALYZE, BUFFERS)` evidence.
 | Preview plans/latency | Passed | First page 55 ms, deep page 61 ms; underlying page used `idx_assets_ai_tag_untagged_candidates`, no sort/offset, 2.5 ms execution |
 | Production apply | Passed | RPC plus all three indexes verified live on `qsllyeztdwjgirsysgai` at 2026-07-14 16:46 UTC |
 | Production plans/latency | Passed | With `statement_timeout = '8s'`, first 50-row untagged page completed in 19.834 ms and the next 50-row keyset page in 16.746 ms |
-| PopDAM caller adoption | Merged | PopDAM `main` commit `6e7d289`; worker tests/build and frontend cursor tests passed. Railway's first deployment attempt failed and is being retried separately; runtime verification remains pending. |
+| PopDAM caller adoption | Passed | Caller merged in `6e7d289`; Railway build-context fixes landed in `280b9f5` and `9181891`; worker `1.4.3` deployed successfully. Worker tests/build, exact Docker build/startup, frontend cursor tests, and GitHub CI passed. |
 
 Rollback is additive and migration-based: stop the worker, revert the PopDAM
 caller if needed, and leave the RPC/indexes in place unless they are proven
