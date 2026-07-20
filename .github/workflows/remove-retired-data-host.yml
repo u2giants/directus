@@ -1,0 +1,35 @@
+name: Remove retired data hostname
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete retired DNS record
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          auth="Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"
+          zone="$(curl --fail --silent --show-error \
+            'https://api.cloudflare.com/client/v4/zones?name=designflow.app' \
+            -H "$auth" | jq -er '.result | if length == 1 then .[0].id else error("zone lookup was not unique") end')"
+          records="$(curl --fail --silent --show-error \
+            "https://api.cloudflare.com/client/v4/zones/${zone}/dns_records?name=data.designflow.app" \
+            -H "$auth")"
+          mapfile -t record_ids < <(jq -r '.result[].id' <<<"$records")
+          for record_id in "${record_ids[@]}"; do
+            curl --fail --silent --show-error -X DELETE \
+              "https://api.cloudflare.com/client/v4/zones/${zone}/dns_records/${record_id}" \
+              -H "$auth" >/dev/null
+          done
+          remaining="$(curl --fail --silent --show-error \
+            "https://api.cloudflare.com/client/v4/zones/${zone}/dns_records?name=data.designflow.app" \
+            -H "$auth" | jq -r '.result | length')"
+          test "$remaining" = 0
