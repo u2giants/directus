@@ -1,6 +1,6 @@
 # How the Business Works — POP Creations & Spruce Line
 
-**Purpose.** This document explains how this company actually designs, approves, and finishes a product — who touches it, in what order, through every level of approval (including licensors), from a first idea to a finished, shipped item. It also records how the people who run the work *wish* the process ran. It is written for someone (human or AI) who needs to understand the **business and its workflow** with no prior context. It deliberately avoids software-design instructions; the companion document `pm-system-design.md` covers the system to build.
+**Purpose.** This document explains how this company actually designs, approves, and finishes a product — who touches it, in what order, through every level of approval (including licensors), from a first idea to a finished, shipped item. It also records how the people who run the work *wish* the process ran. It is written for someone (human or AI) who needs to understand the **business and its workflow** with no prior context. It deliberately avoids prescribing a particular software platform.
 
 **Where this knowledge comes from.** This is a synthesis of the month-long ClickUp monitoring, the D1 evidence pack, and 77 structured interview answers across four rounds (May–June 2026) with the three people who run the two lines:
 - **Jessica Cortázar** — Project Manager, POP Creations (the licensed line).

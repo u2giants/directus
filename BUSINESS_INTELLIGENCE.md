@@ -5,7 +5,7 @@
 
 **Canonical documents (read these first):** the interview material is now split into two focused docs that this file backs with data:
 - `docs/business-process.md` — how the company works, the product journey, who touches what, and how the team wishes it ran (no software).
-- `docs/pm-system-design.md` — current ClickUp usage and how to tailor open-source Plane into the target PM system (the implementation plan).
+- `docs/business-process.md` — the current ClickUp workflow and the business process a future PM application must support.
 
 This file (`BUSINESS_INTELLIGENCE.md`) is the **data-evidence layer** behind both: live D1 analysis, volumes, tag taxonomy, pipeline/checkpoint definitions, and the SLA tables. The older `docs/interview-synthesis.md` is now a pointer to the two canonical docs.
 
